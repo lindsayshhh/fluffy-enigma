@@ -1,0 +1,14 @@
+{
+  "name": "overhead",
+  "version": "1.0.0",
+  "description": "A widget that tells you what airplane is flying right above you",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

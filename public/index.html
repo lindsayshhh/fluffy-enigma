@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Overhead — what's flying above you</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="page">
+    <div class="widget" id="widget">
+      <header class="widget__header">
+        <span class="widget__title">✈️ Overhead</span>
+        <button class="widget__refresh" id="refreshBtn" title="Refresh now" aria-label="Refresh">⟳</button>
+      </header>
+
+      <div class="widget__body" id="body">
+        <div class="state state--loading">
+          <p>Finding your location…</p>
+        </div>
+      </div>
+
+      <footer class="widget__footer">
+        <span id="footerText">Waiting for location</span>
+      </footer>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
