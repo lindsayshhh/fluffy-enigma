@@ -27,6 +27,17 @@ const PROVIDERS = [
 const CONTACT_URL = process.env.CONTACT_URL || 'https://github.com/lindsayshhh/fluffy-enigma';
 const USER_AGENT = `Overhead/1.0 (+${CONTACT_URL})`;
 
+// ADS-B carries no origin/destination — a transponder broadcasts position and
+// callsign, not a route. adsbdb maps a callsign to its scheduled route; it's
+// free and keyless. (adsb.lol's /api/0/routeset is the other option if this
+// one goes away.) A 404 means the route simply isn't known, which is the
+// normal case for general aviation flying no scheduled route at all.
+const ROUTE_API_URL = process.env.ROUTE_API_URL || 'https://api.adsbdb.com/v0/callsign';
+// Routes don't change mid-flight, so these cache far longer than positions.
+const ROUTE_CACHE_TTL_MS = 30 * 60 * 1000;
+const ROUTE_CACHE_MAX = 500;
+const routeCache = new Map();
+
 const EARTH_RADIUS_MI = 3958.8;
 const MI_PER_NM = 1.15078;
 
@@ -133,6 +144,96 @@ function extractAircraftArray(json) {
   return null;
 }
 
+function pickField(obj, keys) {
+  for (const key of keys) {
+    const value = obj?.[key];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return null;
+}
+
+function normalizeAirport(a) {
+  if (!a || typeof a !== 'object') return null;
+  const iata = pickField(a, ['iata_code', 'iata']);
+  const icao = pickField(a, ['icao_code', 'icao']);
+  if (!iata && !icao) return null;
+  return {
+    iata,
+    icao,
+    name: pickField(a, ['name', 'airport']),
+    municipality: pickField(a, ['municipality', 'city', 'town']),
+    country: pickField(a, ['country_name', 'country']),
+  };
+}
+
+// Digs out the origin/destination pair without assuming how deeply the
+// provider nests them, so a wrapper change doesn't read as "no route".
+function extractRoute(json) {
+  const candidates = [json?.response?.flightroute, json?.flightroute, json?.route, json];
+  for (const candidate of candidates) {
+    const origin = normalizeAirport(candidate?.origin);
+    const destination = normalizeAirport(candidate?.destination);
+    if (origin || destination) return { origin, destination };
+  }
+  return null;
+}
+
+async function fetchRoute(callsign) {
+  const key = callsign.toUpperCase();
+  const now = Date.now();
+  const hit = routeCache.get(key);
+  if (hit && hit.expires > now) return hit.data;
+
+  let route = null;
+  try {
+    const res = await fetch(`${ROUTE_API_URL}/${encodeURIComponent(key)}`, {
+      signal: AbortSignal.timeout(6000),
+      headers: { accept: 'application/json', 'user-agent': USER_AGENT },
+    });
+    // 404 is the documented "unknown callsign" answer, not an error worth surfacing.
+    if (res.ok) route = extractRoute(await res.json());
+  } catch {
+    route = null;
+  }
+
+  if (routeCache.size >= ROUTE_CACHE_MAX) {
+    routeCache.delete(routeCache.keys().next().value);
+  }
+  routeCache.set(key, { expires: now + ROUTE_CACHE_TTL_MS, data: route });
+  return route;
+}
+
+async function handleRoute(req, res, query) {
+  const callsign = (query.get('callsign') || '').trim();
+  if (!callsign) {
+    return sendJson(res, 400, { error: 'A callsign is required.' });
+  }
+
+  if (query.get('debug') === '1') {
+    const url = `${ROUTE_API_URL}/${encodeURIComponent(callsign.toUpperCase())}`;
+    try {
+      const probe = await fetch(url, {
+        signal: AbortSignal.timeout(6000),
+        headers: { accept: 'application/json', 'user-agent': USER_AGENT },
+      });
+      const body = await probe.text();
+      let parsed = null;
+      try { parsed = JSON.parse(body); } catch { /* reported via bodyPreview */ }
+      return sendJson(res, 200, {
+        debug: true,
+        url,
+        status: probe.status,
+        recognizedRoute: parsed ? extractRoute(parsed) !== null : false,
+        bodyPreview: body.slice(0, 600),
+      });
+    } catch (err) {
+      return sendJson(res, 502, { debug: true, url, error: String(err) });
+    }
+  }
+
+  sendJson(res, 200, { callsign, route: await fetchRoute(callsign) });
+}
+
 async function handleOverhead(req, res, query) {
   const latParam = query.get('lat');
   const lonParam = query.get('lon');
@@ -222,12 +323,18 @@ async function handleOverhead(req, res, query) {
 
   states.sort((a, b) => a.distanceMiles - b.distanceMiles);
 
+  // Only the nearest is shown on the card, so only it needs a route lookup.
+  const nearest = states[0] || null;
+  if (nearest?.callsign) {
+    nearest.route = await fetchRoute(nearest.callsign);
+  }
+
   const payload = {
     queried: { lat, lon, radiusMiles },
     provider: usedProvider,
     providerFailures: failures,
     count: states.length,
-    nearest: states[0] || null,
+    nearest,
     nearby: states.slice(0, 5),
     fetchedAt: new Date().toISOString(),
   };
@@ -258,6 +365,13 @@ function serveStatic(req, res, pathname) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+
+  if (url.pathname === '/api/route') {
+    handleRoute(req, res, url.searchParams).catch((err) => {
+      sendJson(res, 500, { error: 'Unexpected server error.', detail: String(err) });
+    });
+    return;
+  }
 
   if (url.pathname === '/api/overhead') {
     handleOverhead(req, res, url.searchParams).catch((err) => {

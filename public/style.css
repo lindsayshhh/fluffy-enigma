@@ -219,6 +219,12 @@ body {
   grid-column: 1 / -1;
 }
 
+.stat__sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 1px;
+}
+
 .stat--alert .stat__label,
 .stat--alert .stat__value {
   color: var(--danger);

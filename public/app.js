@@ -73,6 +73,27 @@ function compassPoint(deg) {
   return COMPASS[Math.round(deg / 22.5) % 16];
 }
 
+function airportCode(airport) {
+  return airport ? airport.iata || airport.icao || '?' : '?';
+}
+
+function airportPlace(airport) {
+  return airport ? airport.municipality || airport.name || '' : '';
+}
+
+function routeHtml(route) {
+  if (!route || (!route.origin && !route.destination)) return '';
+  const codes = `${airportCode(route.origin)} → ${airportCode(route.destination)}`;
+  const places = [airportPlace(route.origin), airportPlace(route.destination)].filter(Boolean);
+  const sub = places.length === 2 ? places.join(' → ') : places[0] || '';
+  return `
+    <div class="stat--wide">
+      <div class="stat__label">Route</div>
+      <div class="stat__value">${escapeHtml(codes)}</div>
+      ${sub ? `<div class="stat__sub">${escapeHtml(sub)}</div>` : ''}
+    </div>`;
+}
+
 function renderPlane(plane) {
   const callsign = (plane.callsign || '').trim() || (plane.icao24 || '').toUpperCase() || 'Unknown';
   const subtitle = plane.description
@@ -88,6 +109,7 @@ function renderPlane(plane) {
 
   const look = compassPoint(plane.bearingDeg);
   const identity = [plane.registration, plane.aircraftType, plane.year].filter(Boolean).join(' · ');
+  const route = routeHtml(plane.route);
 
   render(`
     <div class="plane">
@@ -99,6 +121,7 @@ function renderPlane(plane) {
       </div>
 
       <div class="plane__stats">
+        ${route}
         <div>
           <div class="stat__label">Distance</div>
           <div class="stat__value">${fmt(plane.distanceMiles, 'mi', 1)}</div>

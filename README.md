@@ -6,7 +6,7 @@ A tiny widget that tells you what airplane is flying above your current location
 
 - The browser widget asks for your location (or you can type in coordinates manually).
 - A small Node server queries a free, keyless ADS-B aggregator for aircraft within a radius of your position, computes the closest one, and returns it.
-- The widget displays the nearest plane's callsign, aircraft description, operator, altitude, speed, distance and the compass direction to look in, refreshing every 15 seconds.
+- The widget displays the nearest plane's callsign, aircraft description, operator, route, altitude, speed, distance and the compass direction to look in, refreshing every 15 seconds.
 
 All units are imperial: miles, mph, feet.
 
@@ -55,6 +55,7 @@ Returns the nearest airborne aircraft to the given coordinates within `radius` m
 - Tries adsb.fi first, then adsb.lol — both free community ADS-B feeds, no signup. The server caches responses per-location for 8 seconds to be a good citizen.
 - **These feeds want to know who's calling.** adsb.lol rejects requests with a generic User-Agent, so every outbound request identifies itself as `Overhead/1.0 (+<contact>)`. That contact defaults to this repo's URL; set `CONTACT_URL` to point somewhere that reaches you if you're running your own deployment.
 - **airplanes.live is not in the chain.** It returns 403 to unregistered callers and asks you to email contact@airplanes.live describing your project. If they grant access, add it back to `PROVIDERS` in `server.js`.
+- **Routes come from a second lookup.** ADS-B carries no origin/destination — a transponder broadcasts position and callsign, not a route — so the callsign is resolved against [adsbdb](https://www.adsbdb.com/) (free, keyless). Aircraft flying no scheduled route, which is most general aviation, simply have none; the card omits the row rather than showing a blank. `ROUTE_API_URL` overrides the endpoint, and `GET /api/route?callsign=XXX&debug=1` shows the raw upstream body.
 - `GET /api/overhead?...&debug=1` probes every provider and reports each one's status, top-level JSON keys and a body preview — the fastest way to tell a blocked request from a changed response shape.
 - This project originally used the OpenSky Network API, but its anonymous access has become unreliable (tight rate limits, push toward registered OAuth clients), so it was swapped out.
 - If your environment blocks outbound requests to these hosts, the widget will show a fetch error — this is a network/firewall restriction, not a bug in the app.
