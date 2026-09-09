@@ -69,9 +69,18 @@ function renderEmpty() {
   `);
 }
 
+const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+
+function compassPoint(deg) {
+  if (deg == null) return null;
+  return COMPASS[Math.round(deg / 22.5) % 16];
+}
+
 function renderPlane(plane) {
   const callsign = (plane.callsign || '').trim() || (plane.icao24 || '').toUpperCase() || 'Unknown';
-  const subtitle = [plane.aircraftType, plane.registration].filter(Boolean).join(' · ') || 'Type unknown';
+  const subtitle = plane.description
+    || [plane.aircraftType, plane.registration].filter(Boolean).join(' · ')
+    || 'Type unknown';
   const heading = plane.heading ?? 0;
   const verticalRate = plane.verticalRateFtMin;
   let trend = 'level';
@@ -79,6 +88,9 @@ function renderPlane(plane) {
     if (verticalRate > 150) trend = 'climbing';
     else if (verticalRate < -150) trend = 'descending';
   }
+
+  const look = compassPoint(plane.bearingDeg);
+  const identity = [plane.registration, plane.aircraftType, plane.year].filter(Boolean).join(' · ');
 
   render(`
     <div class="plane">
@@ -106,10 +118,29 @@ function renderPlane(plane) {
           <div class="stat__label">Trend</div>
           <div class="stat__value">${trend}</div>
         </div>
-        <div class="stat--wide">
-          <div class="stat__label">ICAO24</div>
-          <div class="stat__value">${plane.icao24 || '—'}</div>
+        <div>
+          <div class="stat__label">Look</div>
+          <div class="stat__value">${look || '—'}</div>
         </div>
+        <div>
+          <div class="stat__label">Squawk</div>
+          <div class="stat__value">${escapeHtml(plane.squawk || '—')}</div>
+        </div>
+        ${plane.emergency ? `
+        <div class="stat--wide stat--alert">
+          <div class="stat__label">Emergency</div>
+          <div class="stat__value">${escapeHtml(plane.emergency)}</div>
+        </div>` : ''}
+        ${plane.operator ? `
+        <div class="stat--wide">
+          <div class="stat__label">Operator</div>
+          <div class="stat__value">${escapeHtml(plane.operator)}</div>
+        </div>` : ''}
+        ${identity ? `
+        <div class="stat--wide">
+          <div class="stat__label">Aircraft</div>
+          <div class="stat__value">${escapeHtml(identity)}</div>
+        </div>` : ''}
       </div>
     </div>
   `);

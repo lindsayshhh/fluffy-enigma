@@ -68,14 +68,30 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
 }
 
+// Bearing from the observer to the aircraft — which way to actually look.
+// Computed here rather than read from a provider's own `dir` field, since
+// not every feed supplies one.
+function bearingDeg(lat1, lon1, lat2, lon2) {
+  const dLon = toRad(lon2 - lon1);
+  const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
 function rowToState(ac, lat, lon) {
   if (typeof ac.lat !== 'number' || typeof ac.lon !== 'number') return null;
   const onGround = ac.alt_baro === 'ground';
   const altitudeFt = typeof ac.alt_baro === 'number' ? ac.alt_baro : null;
+  const emergency = ac.emergency && ac.emergency !== 'none' ? ac.emergency : null;
   return {
     icao24: ac.hex,
     callsign: (ac.flight || '').trim() || null,
     aircraftType: ac.t || null,
+    description: ac.desc || null,
+    operator: ac.ownOp || null,
+    year: ac.year || null,
     registration: ac.r || null,
     latitude: ac.lat,
     longitude: ac.lon,
@@ -85,7 +101,9 @@ function rowToState(ac, lat, lon) {
     heading: typeof ac.track === 'number' ? ac.track : null,
     verticalRateFtMin: typeof ac.baro_rate === 'number' ? ac.baro_rate : null,
     squawk: ac.squawk || null,
+    emergency,
     distanceKm: haversineKm(lat, lon, ac.lat, ac.lon),
+    bearingDeg: bearingDeg(lat, lon, ac.lat, ac.lon),
   };
 }
 
