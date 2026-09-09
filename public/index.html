@@ -15,21 +15,37 @@
 </head>
 <body>
   <main class="page">
-    <div class="widget" id="widget">
-      <header class="widget__header">
-        <span class="widget__title">✈️ Overhead</span>
-        <button class="widget__refresh" id="refreshBtn" title="Refresh now" aria-label="Refresh">⟳</button>
-      </header>
+    <div class="cabin">
+      <div class="shade" aria-hidden="true"></div>
 
-      <div class="widget__body" id="body">
-        <div class="state state--loading">
-          <p>Finding your location…</p>
+      <div class="window">
+        <div class="pane">
+          <div class="sky" id="sky" aria-hidden="true">
+            <span class="sky__body"></span>
+            <span class="cloud cloud--a"></span>
+            <span class="cloud cloud--b"></span>
+            <span class="cloud cloud--c"></span>
+          </div>
+
+          <div class="pane__content" id="body">
+            <div class="state">
+              <p>Finding your location…</p>
+            </div>
+          </div>
+
+          <div class="pane__glare" aria-hidden="true"></div>
         </div>
+        <span class="window__vent" aria-hidden="true"></span>
       </div>
 
-      <footer class="widget__footer">
-        <span id="footerText">Waiting for location</span>
-      </footer>
+      <div class="placard">
+        <div class="placard__head">
+          <span class="placard__title">Overhead</span>
+          <button class="placard__refresh" id="refreshBtn" title="Refresh now" aria-label="Refresh">⟳</button>
+        </div>
+        <div class="placard__stats" id="stats"></div>
+        <div class="placard__footer"><span id="footerText">Waiting for location</span></div>
+      </div>
     </div>
   </main>
 

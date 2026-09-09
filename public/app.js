@@ -1,4 +1,6 @@
 const body = document.getElementById('body');
+const statsEl = document.getElementById('stats');
+const skyEl = document.getElementById('sky');
 const footerText = document.getElementById('footerText');
 const refreshBtn = document.getElementById('refreshBtn');
 
@@ -8,6 +10,17 @@ let currentCoords = null;
 
 function render(html) {
   body.innerHTML = html;
+  statsEl.innerHTML = '';
+}
+
+// The sky you're looking out at tracks the viewer's own clock.
+function applySkyPhase() {
+  const hour = new Date().getHours();
+  const phase = hour < 5 || hour >= 20 ? 'night'
+    : hour < 8 ? 'dawn'
+    : hour < 17 ? 'day'
+    : 'dusk';
+  skyEl.className = `sky sky--${phase}`;
 }
 
 function setFooter(text) {
@@ -87,11 +100,8 @@ function routeHtml(route) {
   const places = [airportPlace(route.origin), airportPlace(route.destination)].filter(Boolean);
   const sub = places.length === 2 ? places.join(' → ') : places[0] || '';
   return `
-    <div class="stat--wide">
-      <div class="stat__label">Route</div>
-      <div class="stat__value">${escapeHtml(codes)}</div>
-      ${sub ? `<div class="stat__sub">${escapeHtml(sub)}</div>` : ''}
-    </div>`;
+    <div class="spotted__route">${escapeHtml(codes)}</div>
+    ${sub ? `<div class="spotted__route-sub">${escapeHtml(sub)}</div>` : ''}`;
 }
 
 function renderPlane(plane) {
@@ -111,59 +121,60 @@ function renderPlane(plane) {
   const identity = [plane.registration, plane.aircraftType, plane.year].filter(Boolean).join(' · ');
   const route = routeHtml(plane.route);
 
-  render(`
-    <div class="plane">
-      <div class="plane__callsign">${escapeHtml(callsign)}</div>
-      <div class="plane__country">${escapeHtml(subtitle)}</div>
-
-      <div class="plane__compass">
-        <span class="plane__arrow" style="transform: rotate(${heading}deg)">↑</span>
-      </div>
-
-      <div class="plane__stats">
+  // Out of the window: the aircraft itself, turned to its real heading.
+  body.innerHTML = `
+    <div class="spotted">
+      <div class="spotted__mark" style="transform: rotate(${heading}deg)">✈</div>
+      <div class="spotted__label">
+        <div class="spotted__callsign">${escapeHtml(callsign)}</div>
+        <div class="spotted__desc">${escapeHtml(subtitle)}</div>
         ${route}
-        <div>
-          <div class="stat__label">Distance</div>
-          <div class="stat__value">${fmt(plane.distanceMiles, 'mi', 1)}</div>
-        </div>
-        <div>
-          <div class="stat__label">Altitude</div>
-          <div class="stat__value">${plane.altitudeFt != null ? Math.round(plane.altitudeFt).toLocaleString() + ' ft' : '—'}</div>
-        </div>
-        <div>
-          <div class="stat__label">Speed</div>
-          <div class="stat__value">${fmt(plane.speedMph, 'mph')}</div>
-        </div>
-        <div>
-          <div class="stat__label">Trend</div>
-          <div class="stat__value">${trend}</div>
-        </div>
-        <div>
-          <div class="stat__label">Look</div>
-          <div class="stat__value">${look || '—'}</div>
-        </div>
-        <div>
-          <div class="stat__label">Squawk</div>
-          <div class="stat__value">${escapeHtml(plane.squawk || '—')}</div>
-        </div>
-        ${plane.emergency ? `
-        <div class="stat--wide stat--alert">
-          <div class="stat__label">Emergency</div>
-          <div class="stat__value">${escapeHtml(plane.emergency)}</div>
-        </div>` : ''}
-        ${plane.operator ? `
-        <div class="stat--wide">
-          <div class="stat__label">Operator</div>
-          <div class="stat__value">${escapeHtml(plane.operator)}</div>
-        </div>` : ''}
-        ${identity ? `
-        <div class="stat--wide">
-          <div class="stat__label">Aircraft</div>
-          <div class="stat__value">${escapeHtml(identity)}</div>
-        </div>` : ''}
       </div>
     </div>
-  `);
+  `;
+
+  // On the cabin wall: the numbers.
+  statsEl.innerHTML = `
+    <div>
+      <div class="stat__label">Distance</div>
+      <div class="stat__value">${fmt(plane.distanceMiles, 'mi', 1)}</div>
+    </div>
+    <div>
+      <div class="stat__label">Altitude</div>
+      <div class="stat__value">${plane.altitudeFt != null ? Math.round(plane.altitudeFt).toLocaleString() + ' ft' : '—'}</div>
+    </div>
+    <div>
+      <div class="stat__label">Speed</div>
+      <div class="stat__value">${fmt(plane.speedMph, 'mph')}</div>
+    </div>
+    <div>
+      <div class="stat__label">Trend</div>
+      <div class="stat__value">${trend}</div>
+    </div>
+    <div>
+      <div class="stat__label">Look</div>
+      <div class="stat__value">${look || '—'}</div>
+    </div>
+    <div>
+      <div class="stat__label">Squawk</div>
+      <div class="stat__value">${escapeHtml(plane.squawk || '—')}</div>
+    </div>
+    ${plane.emergency ? `
+    <div class="stat--wide stat--alert">
+      <div class="stat__label">Emergency</div>
+      <div class="stat__value">${escapeHtml(plane.emergency)}</div>
+    </div>` : ''}
+    ${plane.operator ? `
+    <div class="stat--wide">
+      <div class="stat__label">Operator</div>
+      <div class="stat__value">${escapeHtml(plane.operator)}</div>
+    </div>` : ''}
+    ${identity ? `
+    <div class="stat--wide">
+      <div class="stat__label">Aircraft</div>
+      <div class="stat__value">${escapeHtml(identity)}</div>
+    </div>` : ''}
+  `;
 }
 
 function escapeHtml(str) {
@@ -229,5 +240,8 @@ function start() {
 }
 
 refreshBtn.addEventListener('click', poll);
+
+applySkyPhase();
+setInterval(applySkyPhase, 5 * 60 * 1000);
 
 start();

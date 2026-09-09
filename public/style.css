@@ -1,36 +1,37 @@
 :root {
   color-scheme: light dark;
-  --bg: #0b1120;
-  --card: #131c31;
-  --card-border: #24304a;
-  --text: #eef2f9;
-  --text-dim: #93a1bd;
-  --accent: #5eb1ff;
-  --accent-soft: rgba(94, 177, 255, 0.15);
-  --danger: #ff8a8a;
-  --radius: 18px;
+  /* Cabin interior: warm grey moulded plastic. */
+  --cabin: #dedbd4;
+  --cabin-edge: #c6c2b9;
+  --cabin-deep: #b4afa5;
+  --placard: #f2f0eb;
+  --text: #1d2230;
+  --text-dim: #6a7183;
+  --accent: #1c5fc2;
+  --danger: #b3261e;
+  --pane-shadow: rgba(28, 32, 44, 0.42);
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    --bg: #eef2f9;
-    --card: #ffffff;
-    --card-border: #dbe2ee;
-    --text: #101728;
-    --text-dim: #5b667d;
-    --accent: #1c7ed6;
-    --accent-soft: rgba(28, 126, 214, 0.1);
+    --cabin: #23252c;
+    --cabin-edge: #171920;
+    --cabin-deep: #0e1015;
+    --placard: #2b2e37;
+    --text: #eceef4;
+    --text-dim: #99a0b2;
+    --accent: #6fb5ff;
+    --danger: #ff8a8a;
+    --pane-shadow: rgba(0, 0, 0, 0.7);
   }
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: var(--bg);
+  background: var(--cabin-deep);
   color: var(--text);
 }
 
@@ -39,193 +40,357 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 28px 20px;
 }
 
-.widget {
+/* ---- fuselage wall ---- */
+.cabin {
   width: 100%;
-  max-width: 380px;
-  background: var(--card);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  max-width: 330px;
+  background:
+    linear-gradient(180deg, var(--cabin) 0%, var(--cabin-edge) 100%);
+  border-radius: 34px;
+  padding: 20px 20px 18px;
+  box-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
-.widget__header {
+/* the shade handle recessed above the window */
+.shade {
+  width: 74px;
+  height: 7px;
+  margin: 0 auto 16px;
+  border-radius: 99px;
+  background: var(--cabin-deep);
+  opacity: 0.35;
+}
+
+/* ---- the window opening ---- */
+.window {
+  position: relative;
+  border-radius: 96px / 74px;
+  padding: 13px;
+  background: linear-gradient(180deg, var(--cabin-edge), var(--cabin-deep));
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.32);
+}
+
+.pane {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 84px / 64px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.13),
+    inset 0 10px 26px var(--pane-shadow),
+    inset 0 -8px 22px var(--pane-shadow);
+}
+
+/* the breather hole */
+.window__vent {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+  z-index: 3;
+}
+
+/* a soft diagonal reflection across the glass */
+.pane__glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    128deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.07) 26%,
+    transparent 46%
+  );
+  z-index: 2;
+}
+
+/* ---- sky ---- */
+.sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #3f95dd 0%, #8ec6ec 58%, #cfe6f7 100%);
+}
+
+.sky--dawn { background: linear-gradient(180deg, #2f4a80 0%, #d38b68 62%, #f4cda4 100%); }
+.sky--dusk { background: linear-gradient(180deg, #1d2e55 0%, #a85c85 56%, #e8945f 100%); }
+.sky--night { background: linear-gradient(180deg, #050b1c 0%, #0d1a36 58%, #172a4e 100%); }
+
+/* sun or moon */
+.sky__body {
+  position: absolute;
+  top: 16%;
+  right: 20%;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fffbe8 42%, rgba(255, 245, 200, 0.42) 62%, transparent 72%);
+}
+
+.sky--night .sky__body {
+  background: radial-gradient(circle at 38% 38%, #eef1f8 46%, #c3cad9 58%, transparent 68%);
+  width: 30px;
+  height: 30px;
+}
+
+/* a scatter of stars, only after dark */
+.sky--night::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.4px 1.4px at 18% 22%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 62% 14%, #dfe6f5, transparent),
+    radial-gradient(1.5px 1.5px at 34% 40%, #fff, transparent),
+    radial-gradient(1.1px 1.1px at 78% 33%, #cdd7ee, transparent),
+    radial-gradient(1.3px 1.3px at 46% 9%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 86% 52%, #e6ecfb, transparent);
+  opacity: 0.85;
+}
+
+.cloud {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  filter: blur(9px);
+  animation: drift 46s linear infinite;
+}
+
+.cloud--a { width: 120px; height: 34px; top: 44%; left: -30%; }
+.cloud--b { width: 84px;  height: 26px; top: 62%; left: -50%; animation-duration: 62s; }
+.cloud--c { width: 150px; height: 40px; top: 78%; left: -70%; animation-duration: 78s; }
+
+.sky--night .cloud { background: rgba(190, 205, 235, 0.16); }
+
+@keyframes drift {
+  to { transform: translateX(320px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloud { animation: none; }
+}
+
+/* ---- what you see out of the window ---- */
+.pane__content {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 34px 26px;
+  text-align: center;
+}
+
+.spotted {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--card-border);
-}
-
-.widget__title {
-  font-weight: 600;
-  font-size: 15px;
-  letter-spacing: 0.2px;
-}
-
-.widget__refresh {
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  font-size: 18px;
-  cursor: pointer;
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s, color 0.15s, transform 0.4s;
-}
-
-.widget__refresh:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.widget__refresh.spinning {
-  transform: rotate(360deg);
-}
-
-.widget__body {
-  padding: 22px 18px;
-  min-height: 160px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.widget__footer {
-  padding: 10px 18px;
-  font-size: 12px;
-  color: var(--text-dim);
-  border-top: 1px solid var(--card-border);
-}
-
-.state {
+  height: 100%;
   width: 100%;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 14px;
 }
 
-.state--error {
-  color: var(--danger);
+.spotted__mark {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  line-height: 1;
+  color: #10192b;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.6s cubic-bezier(.2, .8, .2, 1);
 }
+
+.sky--night ~ .pane__content .spotted__mark { color: #dbe4f7; }
+
+/* frosted strip low in the pane, so text never sits on raw sky */
+.spotted__label {
+  width: 100%;
+  border-radius: 14px;
+  padding: 9px 12px 10px;
+  background: rgba(12, 18, 32, 0.44);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  color: #f4f7ff;
+}
+
+.spotted__callsign {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.spotted__desc {
+  font-size: 11.5px;
+  opacity: 0.86;
+  margin-top: 1px;
+  line-height: 1.35;
+}
+
+.spotted__route {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.spotted__route-sub {
+  font-size: 10.5px;
+  opacity: 0.8;
+  margin-top: 1px;
+}
+
+/* loading / error / empty, all read against sky */
+.state {
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(12, 18, 32, 0.46);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  color: #f4f7ff;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.state p { margin: 0; }
+.state--error { color: #ffd9d6; }
 
 .state__action {
-  margin-top: 12px;
-  display: inline-block;
-  background: var(--accent-soft);
-  color: var(--accent);
+  margin-top: 10px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
   border: none;
-  padding: 8px 14px;
+  padding: 7px 13px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 
 .manual-form {
   display: flex;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 10px;
   justify-content: center;
 }
 
 .manual-form input {
-  width: 90px;
-  padding: 8px 10px;
+  width: 72px;
+  padding: 6px 8px;
   border-radius: 8px;
-  border: 1px solid var(--card-border);
-  background: transparent;
-  color: var(--text);
-  font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 12.5px;
+  min-width: 0;
 }
+
+.manual-form input::placeholder { color: rgba(255, 255, 255, 0.6); }
 
 .manual-form button {
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 8px;
   border: none;
-  background: var(--accent);
-  color: #06121f;
+  background: #fff;
+  color: #10192b;
   font-weight: 600;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
-.plane {
-  width: 100%;
+/* ---- placard on the cabin wall ---- */
+.placard {
+  margin-top: 16px;
+  background: var(--placard);
+  border-radius: 14px;
+  padding: 12px 14px 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 5px rgba(0, 0, 0, 0.14);
 }
 
-.plane__callsign {
-  font-size: 26px;
+.placard__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.placard__title {
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.plane__country {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
   color: var(--text-dim);
-  font-size: 13px;
-  margin-top: 2px;
-  line-height: 1.4;
-  text-wrap: balance;
 }
 
-.plane__compass {
-  margin: 18px auto 14px;
-  width: 84px;
-  height: 84px;
-  border-radius: 50%;
-  border: 1px solid var(--card-border);
+.placard__refresh {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 15px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  background: var(--accent-soft);
+  transition: color 0.15s, transform 0.4s;
 }
 
-.plane__arrow {
-  font-size: 34px;
-  color: var(--accent);
-  transition: transform 0.3s ease;
-  display: inline-block;
+.placard__refresh:hover { color: var(--accent); }
+.placard__refresh.spinning { transform: rotate(360deg); }
+
+.placard__refresh:focus-visible,
+.state__action:focus-visible,
+.manual-form button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-.plane__stats {
+.placard__stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px 14px;
+  gap: 9px 12px;
   text-align: left;
-  margin-top: 14px;
 }
 
+.placard__stats:empty { display: none; }
+
 .stat__label {
-  font-size: 11px;
+  font-size: 9.5px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--text-dim);
 }
 
 .stat__value {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 
-.stat--wide {
-  grid-column: 1 / -1;
-}
-
-.stat__sub {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-top: 1px;
-}
+.stat--wide { grid-column: 1 / -1; }
 
 .stat--alert .stat__label,
-.stat--alert .stat__value {
-  color: var(--danger);
+.stat--alert .stat__value { color: var(--danger); }
+
+.placard__footer {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--cabin-edge);
+  font-size: 10.5px;
+  color: var(--text-dim);
 }
