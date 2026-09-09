@@ -94,21 +94,29 @@ function airportPlace(airport) {
   return airport ? airport.municipality || airport.name || '' : '';
 }
 
-function routeHtml(route) {
-  if (!route || (!route.origin && !route.destination)) return '';
-  // Doesn't match where the aircraft actually is, so the pairing is probably
-  // stale — showing nothing beats showing the wrong cities.
-  if (route.suspect) return '';
+// A blank space can't say whether a route doesn't exist or was withheld, so
+// each outcome gets its own words.
+const ROUTE_NOTES = {
+  unknown: 'No route on file — charter and private flights usually have none',
+  mismatch: 'Route lookup returned a different flight',
+  suspect: 'Route on file doesn’t match this position',
+  unavailable: 'Route lookup unavailable',
+};
 
-  const stops = [route.origin, route.midpoint, route.destination].filter(Boolean);
-  if (!stops.length) return '';
+function routeHtml(route, status) {
+  const stops = route ? [route.origin, route.midpoint, route.destination].filter(Boolean) : [];
 
-  const codes = stops.map(airportCode).join(' → ');
-  const places = stops.map(airportPlace);
-  const sub = places.every(Boolean) ? places.join(' → ') : '';
-  return `
-    <div class="spotted__route">${escapeHtml(codes)}</div>
-    ${sub ? `<div class="spotted__route-sub">${escapeHtml(sub)}</div>` : ''}`;
+  if (status === 'ok' && stops.length) {
+    const codes = stops.map(airportCode).join(' → ');
+    const places = stops.map(airportPlace);
+    const sub = places.every(Boolean) ? places.join(' → ') : '';
+    return `
+      <div class="spotted__route">${escapeHtml(codes)}</div>
+      ${sub ? `<div class="spotted__route-sub">${escapeHtml(sub)}</div>` : ''}`;
+  }
+
+  const note = ROUTE_NOTES[status];
+  return note ? `<div class="spotted__route-note">${escapeHtml(note)}</div>` : '';
 }
 
 function renderPlane(plane) {
@@ -126,7 +134,7 @@ function renderPlane(plane) {
 
   const look = compassPoint(plane.bearingDeg);
   const identity = [plane.registration, plane.aircraftType, plane.year].filter(Boolean).join(' · ');
-  const route = routeHtml(plane.route);
+  const route = routeHtml(plane.route, plane.routeStatus);
 
   // Out of the window: the aircraft itself, turned to its real heading.
   body.innerHTML = `

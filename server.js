@@ -223,37 +223,46 @@ async function fetchRoute(callsign, lat, lon) {
   const key = callsign.toUpperCase();
   const now = Date.now();
   const hit = routeCache.get(key);
-  let route = hit && hit.expires > now ? hit.data : undefined;
+  let entry = hit && hit.expires > now ? hit.data : undefined;
 
-  if (route === undefined) {
-    route = null;
+  if (entry === undefined) {
+    entry = { route: null, status: 'unknown' };
     try {
       const res = await fetch(`${ROUTE_API_URL}/${encodeURIComponent(key)}`, {
         signal: AbortSignal.timeout(6000),
         headers: { accept: 'application/json', 'user-agent': USER_AGENT },
       });
-      // 404 is the documented "unknown callsign" answer, not an error worth surfacing.
-      if (res.ok) route = extractRoute(await res.json());
+      if (res.ok) {
+        const route = extractRoute(await res.json());
+        // Guard against a lookup answering for a callsign other than the one asked for.
+        if (route?.allCallsigns.length && !route.allCallsigns.some((c) => String(c).toUpperCase() === key)) {
+          entry = { route: null, status: 'mismatch' };
+        } else if (route) {
+          entry = { route, status: 'ok' };
+        }
+      } else if (res.status !== 404) {
+        // 404 is the documented "no route for this callsign" answer; anything
+        // else means the lookup itself failed and may work on a later try.
+        entry = { route: null, status: 'unavailable' };
+      }
     } catch {
-      route = null;
-    }
-
-    // Guard against a lookup answering for a callsign other than the one asked for.
-    if (route?.allCallsigns.length && !route.allCallsigns.some((c) => String(c).toUpperCase() === key)) {
-      route = null;
+      entry = { route: null, status: 'unavailable' };
     }
 
     if (routeCache.size >= ROUTE_CACHE_MAX) {
       routeCache.delete(routeCache.keys().next().value);
     }
-    routeCache.set(key, { expires: now + ROUTE_CACHE_TTL_MS, data: route });
+    // A failed lookup shouldn't be remembered for half an hour.
+    if (entry.status !== 'unavailable') {
+      routeCache.set(key, { expires: now + ROUTE_CACHE_TTL_MS, data: entry });
+    }
   }
 
-  // Position-dependent, so it is checked per request rather than cached.
-  if (route && lat != null && lon != null && !routeIsPlausible(route, lat, lon)) {
-    return { ...route, suspect: true };
+  // Position-dependent, so it is judged per request rather than cached.
+  if (entry.route && lat != null && lon != null && !routeIsPlausible(entry.route, lat, lon)) {
+    return { route: { ...entry.route, suspect: true }, status: 'suspect' };
   }
-  return route;
+  return entry;
 }
 
 async function handleRoute(req, res, query) {
@@ -287,10 +296,8 @@ async function handleRoute(req, res, query) {
   const lat = Number(query.get('lat'));
   const lon = Number(query.get('lon'));
   const hasPos = Number.isFinite(lat) && Number.isFinite(lon);
-  sendJson(res, 200, {
-    callsign,
-    route: await fetchRoute(callsign, hasPos ? lat : null, hasPos ? lon : null),
-  });
+  const { route, status } = await fetchRoute(callsign, hasPos ? lat : null, hasPos ? lon : null);
+  sendJson(res, 200, { callsign, status, route });
 }
 
 async function handleOverhead(req, res, query) {
@@ -385,11 +392,11 @@ async function handleOverhead(req, res, query) {
   // Only the nearest is shown on the card, so only it needs a route lookup.
   const nearest = states[0] || null;
   if (nearest?.callsign) {
-    const route = await fetchRoute(nearest.callsign, nearest.latitude, nearest.longitude);
+    const { route, status } = await fetchRoute(nearest.callsign, nearest.latitude, nearest.longitude);
     // A route that doesn't square with where the aircraft actually is stays in
-    // the payload, flagged, so it's inspectable — the card just won't show it.
+    // the payload, flagged, so it's inspectable — the card explains instead.
     nearest.route = route;
-    nearest.routeSuspect = Boolean(route?.suspect);
+    nearest.routeStatus = status;
   }
 
   const payload = {
