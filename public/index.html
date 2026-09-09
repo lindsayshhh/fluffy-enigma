@@ -1,38 +1,71 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Overhead — what's flying above you</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" href="icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <meta name="theme-color" content="#1c7ed6" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Overhead" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Michigan GOP Legislature Dashboard</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <main class="page">
-    <div class="widget" id="widget">
-      <header class="widget__header">
-        <span class="widget__title">✈️ Overhead</span>
-        <button class="widget__refresh" id="refreshBtn" title="Refresh now" aria-label="Refresh">⟳</button>
-      </header>
-
-      <div class="widget__body" id="body">
-        <div class="state state--loading">
-          <p>Finding your location…</p>
-        </div>
+  <div class="app">
+    <header class="site-header">
+      <div class="header-inner">
+        <h1>Michigan GOP Legislature Dashboard</h1>
+        <p class="subtitle">
+          Republican members of the Michigan State House &amp; Senate — official links, social
+          media, and campaign finance filings in one place.
+        </p>
       </div>
+    </header>
 
-      <footer class="widget__footer">
-        <span id="footerText">Waiting for location</span>
-      </footer>
+    <main class="content">
+      <section class="controls" aria-label="Filter and search">
+        <div class="control-group chamber-tabs" role="tablist" aria-label="Chamber">
+          <button class="chamber-tab is-active" data-chamber="All" role="tab" aria-selected="true">All</button>
+          <button class="chamber-tab" data-chamber="House" role="tab" aria-selected="false">House</button>
+          <button class="chamber-tab" data-chamber="Senate" role="tab" aria-selected="false">Senate</button>
+        </div>
+        <div class="control-group search-group">
+          <input
+            type="search"
+            id="search-input"
+            placeholder="Search by name or district…"
+            aria-label="Search members"
+          />
+        </div>
+        <div class="control-group sort-group">
+          <label for="sort-select">Sort</label>
+          <select id="sort-select">
+            <option value="name">Name (A–Z)</option>
+            <option value="district">District (low–high)</option>
+          </select>
+        </div>
+      </section>
+
+      <p class="result-count" id="result-count" aria-live="polite"></p>
+
+      <section id="member-grid" class="member-grid" aria-label="Members"></section>
+      <p id="empty-state" class="empty-state" hidden>No members match your search.</p>
+    </main>
+
+    <footer class="site-footer">
+      <p id="data-meta"></p>
+      <p>
+        This dashboard links out to legislators' own official and social accounts and to the
+        state's official campaign finance disclosure system rather than storing or restating
+        finance figures itself, so what you see is always the current, authoritative source.
+      </p>
+    </footer>
+  </div>
+
+  <div id="detail-overlay" class="detail-overlay" hidden>
+    <div class="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detail-name">
+      <button class="detail-close" id="detail-close" aria-label="Close">&times;</button>
+      <div id="detail-body"></div>
     </div>
-  </main>
+  </div>
 
-  <script src="app.js"></script>
+  <div id="fb-root"></div>
+  <script src="/app.js"></script>
 </body>
 </html>

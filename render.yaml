@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: overhead
+    name: mi-gop-dashboard
     runtime: node
     plan: free
     buildCommand: "true"

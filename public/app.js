@@ -1,187 +1,230 @@
-const body = document.getElementById('body');
-const footerText = document.getElementById('footerText');
-const refreshBtn = document.getElementById('refreshBtn');
+let ALL_MEMBERS = [];
+let META = {};
 
-const POLL_INTERVAL_MS = 15000;
-let pollTimer = null;
-let currentCoords = null;
+const grid = document.getElementById('member-grid');
+const emptyState = document.getElementById('empty-state');
+const resultCount = document.getElementById('result-count');
+const searchInput = document.getElementById('search-input');
+const sortSelect = document.getElementById('sort-select');
+const chamberTabs = document.querySelectorAll('.chamber-tab');
+const dataMeta = document.getElementById('data-meta');
+const overlay = document.getElementById('detail-overlay');
+const detailBody = document.getElementById('detail-body');
+const detailClose = document.getElementById('detail-close');
 
-function render(html) {
-  body.innerHTML = html;
+let state = { chamber: 'All', query: '', sort: 'name' };
+
+function twitterHandle(url) {
+  if (!url) return null;
+  const match = url.match(/(?:twitter|x)\.com\/@?([A-Za-z0-9_]+)/i);
+  return match ? match[1] : null;
 }
 
-function setFooter(text) {
-  footerText.textContent = text;
+function socialChips(member) {
+  const chips = [];
+  if (member.twitter) chips.push('X / Twitter');
+  if (member.facebook) chips.push('Facebook');
+  if (member.instagram) chips.push('Instagram');
+  if (member.youtube) chips.push('YouTube');
+  return chips;
 }
 
-function metersToFeet(m) {
-  return m == null ? null : Math.round(m * 3.28084);
-}
+function renderGrid() {
+  const q = state.query.trim().toLowerCase();
 
-function msToKmh(ms) {
-  return ms == null ? null : Math.round(ms * 3.6);
-}
-
-function fmt(value, unit, digits = 0) {
-  if (value == null || Number.isNaN(value)) return '—';
-  return `${value.toFixed(digits)} ${unit}`;
-}
-
-function renderLoading(message) {
-  render(`<div class="state state--loading"><p>${message}</p></div>`);
-}
-
-function renderError(message, { showManual = false } = {}) {
-  render(`
-    <div class="state state--error">
-      <p>${message}</p>
-      ${showManual ? manualFormHtml() : `<button class="state__action" id="retryBtn">Try again</button>`}
-    </div>
-  `);
-  const retryBtn = document.getElementById('retryBtn');
-  if (retryBtn) retryBtn.addEventListener('click', start);
-  wireManualForm();
-}
-
-function manualFormHtml() {
-  return `
-    <form class="manual-form" id="manualForm">
-      <input type="text" inputmode="decimal" placeholder="lat" id="manualLat" required />
-      <input type="text" inputmode="decimal" placeholder="lon" id="manualLon" required />
-      <button type="submit">Use</button>
-    </form>
-  `;
-}
-
-function wireManualForm() {
-  const form = document.getElementById('manualForm');
-  if (!form) return;
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const lat = Number(document.getElementById('manualLat').value);
-    const lon = Number(document.getElementById('manualLon').value);
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      setLocation(lat, lon);
-    }
+  let filtered = ALL_MEMBERS.filter((m) => {
+    if (state.chamber !== 'All' && m.chamber !== state.chamber) return false;
+    if (!q) return true;
+    return (
+      m.name.toLowerCase().includes(q) ||
+      String(m.district).includes(q)
+    );
   });
-}
 
-function renderEmpty() {
-  render(`
-    <div class="state">
-      <p>No aircraft detected nearby right now.</p>
-    </div>
-  `);
-}
+  filtered.sort((a, b) => {
+    if (state.sort === 'district') return (a.district || 0) - (b.district || 0);
+    return a.name.localeCompare(b.name);
+  });
 
-function renderPlane(plane) {
-  const callsign = (plane.callsign || '').trim() || plane.icao24.toUpperCase();
-  const altitudeM = plane.geoAltitude ?? plane.baroAltitude;
-  const altitudeFt = metersToFeet(altitudeM);
-  const speedKmh = msToKmh(plane.velocity);
-  const heading = plane.trueTrack ?? 0;
-  const verticalRate = plane.verticalRate;
-  let trend = 'level';
-  if (verticalRate != null) {
-    if (verticalRate > 1) trend = 'climbing';
-    else if (verticalRate < -1) trend = 'descending';
+  grid.innerHTML = '';
+  emptyState.hidden = filtered.length !== 0;
+  resultCount.textContent = filtered.length
+    ? `Showing ${filtered.length} of ${ALL_MEMBERS.length} members`
+    : '';
+
+  for (const member of filtered) {
+    const card = document.createElement('button');
+    card.className = 'member-card';
+    card.type = 'button';
+    card.setAttribute('aria-haspopup', 'dialog');
+
+    const chips = socialChips(member);
+
+    card.innerHTML = `
+      <div class="member-card-top">
+        <span class="member-name">${escapeHtml(member.name)}</span>
+        <span class="chamber-badge">${escapeHtml(member.chamber)}</span>
+      </div>
+      <div class="member-district">District ${escapeHtml(String(member.district ?? '—'))}</div>
+      <div class="member-socials">
+        ${chips.length ? chips.map((c) => `<span class="social-chip">${c}</span>`).join('') : '<span class="social-chip">No social links found</span>'}
+      </div>
+    `;
+
+    card.addEventListener('click', () => openDetail(member));
+    grid.appendChild(card);
   }
-
-  render(`
-    <div class="plane">
-      <div class="plane__callsign">${escapeHtml(callsign)}</div>
-      <div class="plane__country">${escapeHtml(plane.originCountry || 'Unknown origin')}</div>
-
-      <div class="plane__compass">
-        <span class="plane__arrow" style="transform: rotate(${heading}deg)">↑</span>
-      </div>
-
-      <div class="plane__stats">
-        <div>
-          <div class="stat__label">Distance</div>
-          <div class="stat__value">${fmt(plane.distanceKm, 'km', 1)}</div>
-        </div>
-        <div>
-          <div class="stat__label">Altitude</div>
-          <div class="stat__value">${altitudeFt != null ? altitudeFt.toLocaleString() + ' ft' : '—'}</div>
-        </div>
-        <div>
-          <div class="stat__label">Speed</div>
-          <div class="stat__value">${fmt(speedKmh, 'km/h')}</div>
-        </div>
-        <div>
-          <div class="stat__label">Trend</div>
-          <div class="stat__value">${trend}</div>
-        </div>
-        <div class="stat--wide">
-          <div class="stat__label">ICAO24</div>
-          <div class="stat__value">${plane.icao24}</div>
-        </div>
-      </div>
-    </div>
-  `);
 }
 
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
 }
 
-async function fetchOverhead(lat, lon) {
-  const url = `/api/overhead?lat=${lat}&lon=${lon}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || `Request failed (${res.status})`);
+function financeSearchLink(member) {
+  const url = META.campaignFinanceSearchUrl || 'https://mertsplus.michigan.gov/';
+  return url;
+}
+
+function openDetail(member) {
+  const links = [];
+  if (member.officialUrl) links.push({ label: 'Official Legislative Page', url: member.officialUrl });
+  if (member.caucusUrl) links.push({ label: 'Caucus Profile', url: member.caucusUrl });
+  if (member.twitter) links.push({ label: 'X / Twitter', url: member.twitter });
+  if (member.facebook) links.push({ label: 'Facebook', url: member.facebook });
+  if (member.instagram) links.push({ label: 'Instagram', url: member.instagram });
+  if (member.youtube) links.push({ label: 'YouTube', url: member.youtube });
+
+  const financeUrl = financeSearchLink(member);
+
+  let embedsHtml = '';
+  const handle = twitterHandle(member.twitter);
+  if (handle) {
+    embedsHtml += `
+      <div class="embed-block">
+        <a class="twitter-timeline" data-height="420" href="https://twitter.com/${handle}?ref_src=twsrc%5Etfw">Tweets by @${handle}</a>
+      </div>
+    `;
   }
-  return data;
+  if (member.facebook) {
+    embedsHtml += `
+      <div class="embed-block">
+        <div class="fb-page"
+          data-href="${escapeHtml(member.facebook)}"
+          data-tabs="timeline"
+          data-width="500"
+          data-height="420"
+          data-small-header="true"
+          data-adapt-container-width="true"
+          data-hide-cover="false"
+          data-show-facepile="false">
+        </div>
+      </div>
+    `;
+  }
+  if (!embedsHtml) {
+    embedsHtml = '<p class="no-embeds">No embeddable live feed found for this member yet — use the links above to visit their accounts directly.</p>';
+  }
+
+  detailBody.innerHTML = `
+    <div class="detail-header">
+      <h2 id="detail-name">${escapeHtml(member.name)}</h2>
+      <p class="detail-sub">${escapeHtml(member.chamber)} · District ${escapeHtml(String(member.district ?? '—'))}</p>
+    </div>
+    <div class="detail-links">
+      ${links.map((l) => `<a class="link-btn" href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${l.label}</a>`).join('')}
+      <a class="link-btn primary" href="${escapeHtml(financeUrl)}" target="_blank" rel="noopener">Campaign Finance Reports</a>
+    </div>
+    <div class="embed-section">
+      <h3>Social feed</h3>
+      ${embedsHtml}
+    </div>
+  `;
+
+  overlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+
+  // Ask the widget libraries to re-scan the DOM for the embeds we just inserted.
+  if (window.twttr && window.twttr.widgets) {
+    window.twttr.widgets.load(detailBody);
+  }
+  if (window.FB) {
+    window.FB.XFBML.parse(detailBody);
+  }
 }
 
-async function poll() {
-  if (!currentCoords) return;
-  refreshBtn.classList.add('spinning');
+function closeDetail() {
+  overlay.hidden = true;
+  document.body.style.overflow = '';
+  detailBody.innerHTML = '';
+}
+
+detailClose.addEventListener('click', closeDetail);
+overlay.addEventListener('click', (e) => {
+  if (e.target === overlay) closeDetail();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !overlay.hidden) closeDetail();
+});
+
+chamberTabs.forEach((tab) => {
+  tab.addEventListener('click', () => {
+    chamberTabs.forEach((t) => {
+      t.classList.remove('is-active');
+      t.setAttribute('aria-selected', 'false');
+    });
+    tab.classList.add('is-active');
+    tab.setAttribute('aria-selected', 'true');
+    state.chamber = tab.dataset.chamber;
+    renderGrid();
+  });
+});
+
+searchInput.addEventListener('input', (e) => {
+  state.query = e.target.value;
+  renderGrid();
+});
+
+sortSelect.addEventListener('change', (e) => {
+  state.sort = e.target.value;
+  renderGrid();
+});
+
+function loadWidgetScripts() {
+  const tw = document.createElement('script');
+  tw.src = 'https://platform.twitter.com/widgets.js';
+  tw.async = true;
+  document.body.appendChild(tw);
+
+  const fb = document.createElement('script');
+  fb.src = 'https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v19.0';
+  fb.async = true;
+  fb.defer = true;
+  fb.crossOrigin = 'anonymous';
+  document.body.appendChild(fb);
+}
+
+async function init() {
   try {
-    const data = await fetchOverhead(currentCoords.lat, currentCoords.lon);
-    if (data.nearest) {
-      renderPlane(data.nearest);
-      setFooter(`${data.count} aircraft nearby · updated ${new Date(data.fetchedAt).toLocaleTimeString()}`);
-    } else {
-      renderEmpty();
-      setFooter(`Checked at ${new Date(data.fetchedAt).toLocaleTimeString()}`);
-    }
+    const res = await fetch('/data/legislators.json');
+    const data = await res.json();
+    META = data;
+    ALL_MEMBERS = data.members || [];
   } catch (err) {
-    renderError(err.message || 'Something went wrong.');
-    setFooter('Error fetching flight data');
-  } finally {
-    setTimeout(() => refreshBtn.classList.remove('spinning'), 400);
-  }
-}
-
-function setLocation(lat, lon) {
-  currentCoords = { lat, lon };
-  setFooter(`Location: ${lat.toFixed(3)}, ${lon.toFixed(3)}`);
-  renderLoading('Looking up nearby air traffic…');
-  poll();
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(poll, POLL_INTERVAL_MS);
-}
-
-function start() {
-  renderLoading('Finding your location…');
-  if (!navigator.geolocation) {
-    renderError('Geolocation is not supported by this browser. Enter coordinates manually:', { showManual: true });
+    resultCount.textContent = 'Could not load legislator data.';
+    console.error(err);
     return;
   }
-  navigator.geolocation.getCurrentPosition(
-    (pos) => setLocation(pos.coords.latitude, pos.coords.longitude),
-    () => {
-      renderError('Location access was denied. Enter coordinates manually:', { showManual: true });
-    },
-    { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
-  );
+
+  if (META.generatedAt) {
+    dataMeta.textContent = `Data compiled ${new Date(META.generatedAt).toLocaleDateString()} from official Michigan legislature, caucus, and campaign finance sources.`;
+  } else {
+    dataMeta.textContent = 'Data not yet loaded.';
+  }
+
+  renderGrid();
+  loadWidgetScripts();
 }
 
-refreshBtn.addEventListener('click', poll);
-
-start();
+init();

@@ -1,14 +1,25 @@
-# Overhead
+# Michigan GOP Legislature Dashboard
 
-A tiny widget that tells you what airplane is flying above your current location, using live ADS-B data from the [OpenSky Network](https://opensky-network.org/).
+A dashboard of every Republican member of the Michigan State House of Representatives and
+Michigan State Senate, in one place: official contact pages, social media, and a direct link
+to each member's campaign finance filings on the state's own disclosure system.
 
 ## How it works
 
-- The browser widget asks for your location (or you can type in coordinates manually).
-- A small Node server queries OpenSky's public `states/all` API for aircraft within a radius of your position, computes the closest one, and returns it.
-- The widget displays the nearest plane's callsign, origin country, heading, altitude, speed, and distance, refreshing every 15 seconds.
-
-No API keys, no build step, and no dependencies — it's plain Node.js (`http`, built-in `fetch`) and vanilla HTML/CSS/JS.
+- A small static Node server serves the frontend — no build step, no framework, no API keys.
+- Member data (name, district, chamber, official page, and any social accounts found) lives in
+  [`public/data/legislators.json`](public/data/legislators.json), compiled from official
+  Michigan House/Senate and caucus sources.
+- The dashboard lets you filter by chamber, search by name or district, and open a member's
+  detail panel.
+- The detail panel embeds a **live** X/Twitter timeline (via `platform.twitter.com/widgets.js`)
+  and a **live** Facebook Page feed (via the Facebook Page Plugin) directly from the member's
+  own public accounts when available — no API keys required for either. Instagram/YouTube are
+  linked out to directly, since there's no key-free way to embed a live feed for those.
+- Campaign finance reports are **not** stored or restated in this app. Instead, every member
+  links to Michigan's official Bureau of Elections campaign finance disclosure search, so
+  what you see is always the current, authoritative filing — not a number that can go stale
+  or be transcribed wrong.
 
 ## Run it
 
@@ -16,7 +27,7 @@ No API keys, no build step, and no dependencies — it's plain Node.js (`http`, 
 npm start
 ```
 
-Then open http://localhost:3000 and allow location access when prompted.
+Then open http://localhost:3000.
 
 Set `PORT` to run on a different port:
 
@@ -24,23 +35,32 @@ Set `PORT` to run on a different port:
 PORT=8080 npm start
 ```
 
-## API
+## Updating the roster
 
-`GET /api/overhead?lat=<lat>&lon=<lon>&radius=<km>`
-
-Returns the nearest airborne aircraft to the given coordinates within `radius` km (default 60, max 250), plus the 5 nearest for reference:
+Edit `public/data/legislators.json`. Each entry looks like:
 
 ```json
 {
-  "queried": { "lat": 40.64, "lon": -73.78, "radiusKm": 60 },
-  "count": 12,
-  "nearest": { "icao24": "a1b2c3", "callsign": "DAL1892", "originCountry": "United States", "distanceKm": 3.2, ... },
-  "nearby": [ ... ],
-  "fetchedAt": "2026-09-06T18:20:00.000Z"
+  "name": "Full Name",
+  "chamber": "House",
+  "district": 12,
+  "officialUrl": "https://www.house.mi.gov/...",
+  "caucusUrl": "https://www.gophouse.org/...",
+  "twitter": "https://x.com/handle",
+  "facebook": "https://facebook.com/page",
+  "instagram": "https://instagram.com/handle",
+  "youtube": "https://youtube.com/@channel"
 }
 ```
 
+Leave a field `null` if it isn't verified rather than guessing — the dashboard just omits
+that link/embed. The top-level `campaignFinanceSearchUrl` and `campaignFinanceNote` fields
+control the finance link shown for every member.
+
 ## Notes
 
-- OpenSky's anonymous API is rate-limited; the server caches responses per-location for 8 seconds to stay within it.
-- If your environment blocks outbound requests to `opensky-network.org`, the widget will show a fetch error — this is a network/firewall restriction, not a bug in the app.
+- Data reflects the current (2025–2026) legislative term as of when it was compiled; Michigan
+  House seats turn over every 2 years, so re-verify the roster after each general election.
+- If your environment blocks outbound requests to `platform.twitter.com` or
+  `connect.facebook.net`, the live embeds won't render — this is a network restriction, not a
+  bug; the direct link buttons still work.

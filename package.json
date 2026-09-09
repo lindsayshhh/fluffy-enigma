@@ -1,7 +1,7 @@
 {
-  "name": "overhead",
+  "name": "mi-gop-dashboard",
   "version": "1.0.0",
-  "description": "A widget that tells you what airplane is flying right above you",
+  "description": "A dashboard of Michigan Republican State House and Senate members, with links to their social media and campaign finance filings",
   "type": "module",
   "main": "server.js",
   "scripts": {
