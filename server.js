@@ -226,7 +226,41 @@ function routeIsPlausible(route, lat, lon) {
   return viaAircraft <= direct * 1.25 + 250;
 }
 
-async function fetchRoute(callsign, lat, lon) {
+function angularDiff(a, b) {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+// A callsign→route table stores one direction, but a flight number usually
+// works out and back, so half the time the stored pair is the reverse of what
+// the aircraft is actually flying. Position alone can't tell — a plane between
+// two airports looks the same either way — but heading can: whichever airport
+// it is flying toward is the destination.
+function orientRoute(route, lat, lon, heading) {
+  if (!route || route.midpoint || heading == null) return route;
+  const o = route.origin;
+  const d = route.destination;
+  if (o?.latitude == null || o?.longitude == null) return route;
+  if (d?.latitude == null || d?.longitude == null) return route;
+
+  // Near either end, heading reflects departure turns and approach vectors
+  // rather than the direction of travel, so don't read anything into it.
+  const clearOfEnds =
+    haversineMiles(lat, lon, o.latitude, o.longitude) > 25 &&
+    haversineMiles(lat, lon, d.latitude, d.longitude) > 25;
+  if (!clearOfEnds) return route;
+
+  const offOrigin = angularDiff(heading, bearingDeg(lat, lon, o.latitude, o.longitude));
+  const offDest = angularDiff(heading, bearingDeg(lat, lon, d.latitude, d.longitude));
+
+  // Only act on an unambiguous reading: pointed at one end and away from the other.
+  if (offOrigin < 60 && offDest > 120) {
+    return { ...route, origin: d, destination: o, reversed: true };
+  }
+  return route;
+}
+
+async function fetchRoute(callsign, lat, lon, heading) {
   const key = callsign.toUpperCase();
   const now = Date.now();
   const hit = routeCache.get(key);
@@ -274,9 +308,12 @@ async function fetchRoute(callsign, lat, lon) {
     }
   }
 
-  // Position-dependent, so it is judged per request rather than cached.
-  if (entry.route && lat != null && lon != null && !routeIsPlausible(entry.route, lat, lon)) {
-    return { route: { ...entry.route, suspect: true }, status: 'suspect' };
+  // Position- and heading-dependent, so judged per request rather than cached.
+  if (entry.route && lat != null && lon != null) {
+    if (!routeIsPlausible(entry.route, lat, lon)) {
+      return { route: { ...entry.route, suspect: true }, status: 'suspect' };
+    }
+    return { ...entry, route: orientRoute(entry.route, lat, lon, heading) };
   }
   return entry;
 }
@@ -312,7 +349,11 @@ async function handleRoute(req, res, query) {
   const lat = Number(query.get('lat'));
   const lon = Number(query.get('lon'));
   const hasPos = Number.isFinite(lat) && Number.isFinite(lon);
-  const { route, status } = await fetchRoute(callsign, hasPos ? lat : null, hasPos ? lon : null);
+  const headingParam = Number(query.get('heading'));
+  const { route, status } = await fetchRoute(
+    callsign, hasPos ? lat : null, hasPos ? lon : null,
+    Number.isFinite(headingParam) ? headingParam : null
+  );
   sendJson(res, 200, { callsign, status, route });
 }
 
@@ -408,7 +449,9 @@ async function handleOverhead(req, res, query) {
   // Only the nearest is shown on the card, so only it needs a route lookup.
   const nearest = states[0] || null;
   if (nearest?.callsign) {
-    const { route, status } = await fetchRoute(nearest.callsign, nearest.latitude, nearest.longitude);
+    const { route, status } = await fetchRoute(
+      nearest.callsign, nearest.latitude, nearest.longitude, nearest.heading
+    );
     // A route that doesn't square with where the aircraft actually is stays in
     // the payload, flagged, so it's inspectable — the card explains instead.
     nearest.route = route;
