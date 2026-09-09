@@ -1,12 +1,14 @@
 # Overhead
 
-A tiny widget that tells you what airplane is flying above your current location, using live ADS-B data from [airplanes.live](https://airplanes.live/) (falling back to [adsb.lol](https://adsb.lol/) if that's unreachable).
+A tiny widget that tells you what airplane is flying above your current location, using live ADS-B data from [adsb.fi](https://adsb.fi/) (falling back to [adsb.lol](https://adsb.lol/) if that's unreachable).
 
 ## How it works
 
 - The browser widget asks for your location (or you can type in coordinates manually).
 - A small Node server queries a free, keyless ADS-B aggregator for aircraft within a radius of your position, computes the closest one, and returns it.
-- The widget displays the nearest plane's callsign, aircraft type/registration, heading, altitude, speed, and distance, refreshing every 15 seconds.
+- The widget displays the nearest plane's callsign, aircraft description, operator, altitude, speed, distance and the compass direction to look in, refreshing every 15 seconds.
+
+All units are imperial: miles, mph, feet.
 
 No API keys, no build step, and no dependencies — it's plain Node.js (`http`, built-in `fetch`) and vanilla HTML/CSS/JS.
 
@@ -26,37 +28,27 @@ PORT=8080 npm start
 
 ## API
 
-`GET /api/overhead?lat=<lat>&lon=<lon>&radius=<km>`
+`GET /api/overhead?lat=<lat>&lon=<lon>&radius=<miles>`
 
-Returns the nearest airborne aircraft to the given coordinates within `radius` km (default 60, max 250), plus the 5 nearest for reference:
+Returns the nearest airborne aircraft to the given coordinates within `radius` miles (default 40, max 155), plus the 5 nearest for reference:
 
 ```json
 {
-  "queried": { "lat": 40.64, "lon": -73.78, "radiusKm": 60 },
-  "provider": "airplanes.live",
+  "queried": { "lat": 40.64, "lon": -73.78, "radiusMiles": 40 },
+  "provider": "adsb.fi",
   "count": 12,
-  "nearest": { "icao24": "a1b2c3", "callsign": "DAL1892", "aircraftType": "A321", "registration": "N123DL", "distanceKm": 3.2, ... },
+  "nearest": {
+    "icao24": "a1b2c3", "callsign": "DAL1892",
+    "description": "BOEING 737-900", "operator": "DELTA AIR LINES",
+    "registration": "N123DL", "aircraftType": "B739", "year": "2015",
+    "distanceMiles": 2.0, "bearingDeg": 286.5, "altitudeFt": 4800,
+    "speedMph": 254.7, "heading": 216.9, "verticalRateFtMin": -640,
+    "squawk": "1200", "emergency": null
+  },
   "nearby": [ ... ],
   "fetchedAt": "2026-09-06T18:20:00.000Z"
 }
 ```
-
-## ACARS messages (optional)
-
-The widget can show recent ACARS datalink messages for the aircraft overhead. This is off by default and needs an [airframes.io](https://airframes.io/) key:
-
-```bash
-AIRFRAMES_API_KEY=your-key npm start
-```
-
-`AIRFRAMES_API_URL` overrides the endpoint if it differs from the default.
-
-Two things to be realistic about:
-
-- **Most flights will show nothing.** ACARS is only received where a volunteer has a receiver listening, so empty results are the normal case, not an error. The widget says so rather than looking broken.
-- **The upstream response shape is not pinned down here.** Field names are read defensively (several spellings per field). If a real response doesn't parse, request `/api/acars?flight=XXX&debug=1` to see the raw upstream payload and adjust `normalizeAcarsMessage` in `server.js`.
-
-`GET /api/acars?flight=<callsign>&reg=<registration>` returns `{ configured, count, messages[] }`, where each message carries `timestamp`, `label`, `text`, `station` and `link`.
 
 ## Notes
 

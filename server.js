@@ -27,19 +27,8 @@ const PROVIDERS = [
 const CONTACT_URL = process.env.CONTACT_URL || 'https://github.com/lindsayshhh/fluffy-enigma';
 const USER_AGENT = `Overhead/1.0 (+${CONTACT_URL})`;
 
-// ACARS has no keyless equivalent to the ADS-B feeds above. airframes.io
-// pools volunteer VHF/VDL2/HFDL/SATCOM receivers and is the only community
-// aggregator worth pointing at; it needs an account, so the section stays
-// switched off until AIRFRAMES_API_KEY is set. Coverage is inherently
-// patchy — an aircraft is only heard where someone is listening — so "no
-// recent messages" is a normal result, not a failure.
-const ACARS_API_URL = process.env.AIRFRAMES_API_URL || 'https://api.airframes.io/messages';
-const ACARS_API_KEY = process.env.AIRFRAMES_API_KEY || '';
-const ACARS_CACHE_TTL_MS = 20000;
-const ACARS_MAX_MESSAGES = 8;
-
-const EARTH_RADIUS_KM = 6371;
-const KM_PER_NM = 1.852;
+const EARTH_RADIUS_MI = 3958.8;
+const MI_PER_NM = 1.15078;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -59,13 +48,13 @@ function toRad(deg) {
   return (deg * Math.PI) / 180;
 }
 
-function haversineKm(lat1, lon1, lat2, lon2) {
+function haversineMiles(lat1, lon1, lat2, lon2) {
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
+  return 2 * EARTH_RADIUS_MI * Math.asin(Math.sqrt(a));
 }
 
 // Bearing from the observer to the aircraft — which way to actually look.
@@ -97,12 +86,12 @@ function rowToState(ac, lat, lon) {
     longitude: ac.lon,
     altitudeFt,
     onGround,
-    speedKmh: typeof ac.gs === 'number' ? ac.gs * KM_PER_NM : null,
+    speedMph: typeof ac.gs === 'number' ? ac.gs * MI_PER_NM : null,
     heading: typeof ac.track === 'number' ? ac.track : null,
     verticalRateFtMin: typeof ac.baro_rate === 'number' ? ac.baro_rate : null,
     squawk: ac.squawk || null,
     emergency,
-    distanceKm: haversineKm(lat, lon, ac.lat, ac.lon),
+    distanceMiles: haversineMiles(lat, lon, ac.lat, ac.lon),
     bearingDeg: bearingDeg(lat, lon, ac.lat, ac.lon),
   };
 }
@@ -149,13 +138,13 @@ async function handleOverhead(req, res, query) {
   const lonParam = query.get('lon');
   const lat = latParam === null || latParam === '' ? NaN : Number(latParam);
   const lon = lonParam === null || lonParam === '' ? NaN : Number(lonParam);
-  const radiusKm = Math.min(Math.max(Number(query.get('radius')) || 60, 5), 250);
+  const radiusMiles = Math.min(Math.max(Number(query.get('radius')) || 40, 3), 155);
 
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
     return sendJson(res, 400, { error: 'Valid lat and lon query parameters are required.' });
   }
 
-  const cacheKey = `${lat.toFixed(2)},${lon.toFixed(2)},${radiusKm}`;
+  const cacheKey = `${lat.toFixed(2)},${lon.toFixed(2)},${radiusMiles}`;
   const now = Date.now();
   const debug = query.get('debug') === '1';
 
@@ -163,7 +152,7 @@ async function handleOverhead(req, res, query) {
     return sendJson(res, 200, cache.data);
   }
 
-  const radiusNm = Math.min(Math.round(radiusKm / KM_PER_NM), 250);
+  const radiusNm = Math.min(Math.round(radiusMiles / MI_PER_NM), 250);
 
   // Probes every provider and reports what each actually sent back, so a
   // shape mismatch can be read off directly instead of inferred from a
@@ -203,7 +192,7 @@ async function handleOverhead(req, res, query) {
         probes.push({ provider: provider.name, url, error: String(err) });
       }
     }
-    return sendJson(res, 200, { debug: true, queried: { lat, lon, radiusKm, radiusNm }, probes });
+    return sendJson(res, 200, { debug: true, queried: { lat, lon, radiusMiles, radiusNm }, probes });
   }
 
   let aircraft = null;
@@ -231,10 +220,10 @@ async function handleOverhead(req, res, query) {
     .map((ac) => rowToState(ac, lat, lon))
     .filter((s) => s && !s.onGround);
 
-  states.sort((a, b) => a.distanceKm - b.distanceKm);
+  states.sort((a, b) => a.distanceMiles - b.distanceMiles);
 
   const payload = {
-    queried: { lat, lon, radiusKm },
+    queried: { lat, lon, radiusMiles },
     provider: usedProvider,
     providerFailures: failures,
     count: states.length,
@@ -244,117 +233,6 @@ async function handleOverhead(req, res, query) {
   };
 
   cache = { key: cacheKey, expires: now + CACHE_TTL_MS, data: payload };
-  sendJson(res, 200, payload);
-}
-
-let acarsCache = { key: null, expires: 0, data: null };
-
-function pick(obj, keys) {
-  for (const key of keys) {
-    const value = obj[key];
-    if (value !== undefined && value !== null && value !== '') return value;
-  }
-  return null;
-}
-
-// The upstream field names aren't pinned down here, so read each field from
-// the first key that's actually present rather than assuming one spelling.
-function normalizeAcarsMessage(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const text = pick(raw, ['text', 'message_text', 'msg_text', 'message', 'data']);
-  const timestamp = pick(raw, ['timestamp', 'time', 'created_at', 'received_at', 't']);
-  return {
-    timestamp: typeof timestamp === 'number' && timestamp < 1e12 ? timestamp * 1000 : timestamp,
-    label: pick(raw, ['label', 'msg_label']),
-    text: typeof text === 'string' ? text : text == null ? null : JSON.stringify(text),
-    flight: pick(raw, ['flight', 'callsign', 'flight_number']),
-    registration: pick(raw, ['tail', 'registration', 'reg']),
-    station: pick(raw, ['station_id', 'station', 'ground_station', 'source']),
-    link: pick(raw, ['link_type', 'type', 'app_name', 'channel']),
-  };
-}
-
-function extractMessageArray(json) {
-  if (Array.isArray(json)) return json;
-  for (const key of ['messages', 'data', 'results', 'items']) {
-    if (Array.isArray(json?.[key])) return json[key];
-  }
-  return null;
-}
-
-async function handleAcars(req, res, query) {
-  const flight = (query.get('flight') || '').trim();
-  const reg = (query.get('reg') || '').trim();
-  const debug = query.get('debug') === '1';
-
-  if (!flight && !reg) {
-    return sendJson(res, 400, { error: 'A flight callsign or registration is required.' });
-  }
-
-  if (!ACARS_API_KEY) {
-    return sendJson(res, 200, {
-      configured: false,
-      messages: [],
-      note: 'Set AIRFRAMES_API_KEY to enable ACARS lookups.',
-    });
-  }
-
-  const cacheKey = `${flight}|${reg}`;
-  const now = Date.now();
-  if (!debug && acarsCache.key === cacheKey && acarsCache.expires > now) {
-    return sendJson(res, 200, acarsCache.data);
-  }
-
-  const url = new URL(ACARS_API_URL);
-  if (flight) url.searchParams.set('flight', flight);
-  if (reg) url.searchParams.set('registration', reg);
-  url.searchParams.set('limit', String(ACARS_MAX_MESSAGES));
-
-  let upstream;
-  try {
-    upstream = await fetch(url, {
-      signal: AbortSignal.timeout(10000),
-      headers: { accept: 'application/json', 'user-agent': USER_AGENT, authorization: `Bearer ${ACARS_API_KEY}` },
-    });
-  } catch (err) {
-    return sendJson(res, 502, { configured: true, error: 'Could not reach the ACARS provider.', detail: String(err) });
-  }
-
-  if (!upstream.ok) {
-    return sendJson(res, 502, { configured: true, error: `ACARS provider returned ${upstream.status}.` });
-  }
-
-  const json = await upstream.json();
-  const rawMessages = extractMessageArray(json);
-
-  // Returns the untouched upstream body so an unfamiliar response shape can be
-  // inspected directly instead of silently normalizing to an empty list.
-  if (debug) {
-    return sendJson(res, 200, { configured: true, recognizedShape: rawMessages !== null, raw: json });
-  }
-
-  if (rawMessages === null) {
-    return sendJson(res, 502, {
-      configured: true,
-      error: 'Unrecognized response shape from the ACARS provider.',
-      hint: 'Re-request with &debug=1 to see the raw upstream payload.',
-    });
-  }
-
-  const messages = rawMessages
-    .map(normalizeAcarsMessage)
-    .filter((m) => m && m.text)
-    .slice(0, ACARS_MAX_MESSAGES);
-
-  const payload = {
-    configured: true,
-    queried: { flight: flight || null, registration: reg || null },
-    count: messages.length,
-    messages,
-    fetchedAt: new Date().toISOString(),
-  };
-
-  acarsCache = { key: cacheKey, expires: now + ACARS_CACHE_TTL_MS, data: payload };
   sendJson(res, 200, payload);
 }
 
@@ -388,12 +266,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/acars') {
-    handleAcars(req, res, url.searchParams).catch((err) => {
-      sendJson(res, 500, { error: 'Unexpected server error.', detail: String(err) });
-    });
-    return;
-  }
 
   serveStatic(req, res, url.pathname);
 });
