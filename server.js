@@ -8,15 +8,24 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 
 const PORT = process.env.PORT || 3000;
 
-// Free, keyless ADS-B aggregators (community-run tar1090/readsb forks).
-// OpenSky's anonymous REST API has become increasingly unreliable
-// (aggressive rate limits, pushing users toward registered OAuth clients),
-// so we use these instead — adsb.lol as a fallback if airplanes.live errors.
+// Free, keyless ADS-B aggregators (community-run tar1090/readsb forks),
+// ordered by what actually answers. adsb.fi serves anonymous requests;
+// adsb.lol serves them only with a User-Agent naming the project and a way
+// to reach its author, which USER_AGENT below supplies.
+//
+// airplanes.live is deliberately absent: it 403s unregistered callers with
+// a note asking you to email contact@airplanes.live describing the project.
+// Querying it on every request just buys a guaranteed failure and a wasted
+// round trip. Once they grant access, add it back here.
 const PROVIDERS = [
-  { name: 'airplanes.live', urlFor: (lat, lon, radiusNm) => `https://api.airplanes.live/v2/point/${lat}/${lon}/${radiusNm}` },
-  { name: 'adsb.lol', urlFor: (lat, lon, radiusNm) => `https://api.adsb.lol/v2/point/${lat}/${lon}/${radiusNm}` },
   { name: 'adsb.fi', urlFor: (lat, lon, radiusNm) => `https://opendata.adsb.fi/api/v2/lat/${lat}/lon/${lon}/dist/${radiusNm}` },
+  { name: 'adsb.lol', urlFor: (lat, lon, radiusNm) => `https://api.adsb.lol/v2/point/${lat}/${lon}/${radiusNm}` },
 ];
+
+// adsb.lol rejects a generic User-Agent outright. Point CONTACT_URL at
+// something that reaches whoever runs this deployment.
+const CONTACT_URL = process.env.CONTACT_URL || 'https://github.com/lindsayshhh/fluffy-enigma';
+const USER_AGENT = `Overhead/1.0 (+${CONTACT_URL})`;
 
 // ACARS has no keyless equivalent to the ADS-B feeds above. airframes.io
 // pools volunteer VHF/VDL2/HFDL/SATCOM receivers and is the only community
@@ -93,7 +102,7 @@ async function fetchFromProvider(provider, lat, lon, radiusNm) {
   const url = provider.urlFor(lat.toFixed(4), lon.toFixed(4), radiusNm);
   const res = await fetch(url, {
     signal: AbortSignal.timeout(10000),
-    headers: { accept: 'application/json' },
+    headers: { accept: 'application/json', 'user-agent': USER_AGENT },
   });
   if (!res.ok) {
     throw new Error(`${provider.name} returned ${res.status}`);
@@ -148,7 +157,7 @@ async function handleOverhead(req, res, query) {
       try {
         const probeRes = await fetch(url, {
           signal: AbortSignal.timeout(10000),
-          headers: { accept: 'application/json' },
+          headers: { accept: 'application/json', 'user-agent': USER_AGENT },
         });
         const body = await probeRes.text();
         let topLevelKeys = null;
@@ -287,7 +296,7 @@ async function handleAcars(req, res, query) {
   try {
     upstream = await fetch(url, {
       signal: AbortSignal.timeout(10000),
-      headers: { accept: 'application/json', authorization: `Bearer ${ACARS_API_KEY}` },
+      headers: { accept: 'application/json', 'user-agent': USER_AGENT, authorization: `Bearer ${ACARS_API_KEY}` },
     });
   } catch (err) {
     return sendJson(res, 502, { configured: true, error: 'Could not reach the ACARS provider.', detail: String(err) });
