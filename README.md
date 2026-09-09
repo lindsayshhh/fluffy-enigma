@@ -57,6 +57,16 @@ Leave a field `null` if it isn't verified rather than guessing — the dashboard
 that link/embed. The top-level `campaignFinanceSearchUrl` and `campaignFinanceNote` fields
 control the finance link shown for every member.
 
+## Data
+
+The current roster (`public/data/legislators.json`) covers all 76 Republican members of the
+103rd Michigan Legislature (2025–2026 term): 58 in the House, 18 in the Senate. It was compiled
+from official sources — house.mi.gov, senate.michigan.gov, gophouse.org, misenategop.com, and
+Ballotpedia/Wikipedia cross-checks — plus each member's own official and social pages. Social
+links were left `null` rather than guessed wherever they couldn't be independently verified, so
+some members who do have accounts may still show no link; 67 of the 76 currently have at least
+one verified social link.
+
 ## Notes
 
 - Data reflects the current (2025–2026) legislative term as of when it was compiled; Michigan
