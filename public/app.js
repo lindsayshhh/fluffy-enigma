@@ -96,9 +96,16 @@ function airportPlace(airport) {
 
 function routeHtml(route) {
   if (!route || (!route.origin && !route.destination)) return '';
-  const codes = `${airportCode(route.origin)} → ${airportCode(route.destination)}`;
-  const places = [airportPlace(route.origin), airportPlace(route.destination)].filter(Boolean);
-  const sub = places.length === 2 ? places.join(' → ') : places[0] || '';
+  // Doesn't match where the aircraft actually is, so the pairing is probably
+  // stale — showing nothing beats showing the wrong cities.
+  if (route.suspect) return '';
+
+  const stops = [route.origin, route.midpoint, route.destination].filter(Boolean);
+  if (!stops.length) return '';
+
+  const codes = stops.map(airportCode).join(' → ');
+  const places = stops.map(airportPlace);
+  const sub = places.every(Boolean) ? places.join(' → ') : '';
   return `
     <div class="spotted__route">${escapeHtml(codes)}</div>
     ${sub ? `<div class="spotted__route-sub">${escapeHtml(sub)}</div>` : ''}`;

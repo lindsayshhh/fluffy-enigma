@@ -157,49 +157,102 @@ function normalizeAirport(a) {
   const iata = pickField(a, ['iata_code', 'iata']);
   const icao = pickField(a, ['icao_code', 'icao']);
   if (!iata && !icao) return null;
+  const lat = pickField(a, ['latitude', 'lat']);
+  const lon = pickField(a, ['longitude', 'lon', 'lng']);
   return {
     iata,
     icao,
     name: pickField(a, ['name', 'airport']),
     municipality: pickField(a, ['municipality', 'city', 'town']),
     country: pickField(a, ['country_name', 'country']),
+    latitude: typeof lat === 'number' ? lat : null,
+    longitude: typeof lon === 'number' ? lon : null,
   };
 }
 
-// Digs out the origin/destination pair without assuming how deeply the
-// provider nests them, so a wrapper change doesn't read as "no route".
+// Only the documented nestings — not the bare object, which could match
+// unrelated top-level keys and pass off junk as a route.
 function extractRoute(json) {
-  const candidates = [json?.response?.flightroute, json?.flightroute, json?.route, json];
-  for (const candidate of candidates) {
-    const origin = normalizeAirport(candidate?.origin);
-    const destination = normalizeAirport(candidate?.destination);
-    if (origin || destination) return { origin, destination };
+  for (const candidate of [json?.response?.flightroute, json?.flightroute, json?.route]) {
+    if (!candidate) continue;
+    const origin = normalizeAirport(candidate.origin);
+    const destination = normalizeAirport(candidate.destination);
+    if (!origin && !destination) continue;
+    return {
+      origin,
+      // A one-stop route rendered as origin → destination silently drops the
+      // stop, which reads as the wrong city pair for a plane on the second leg.
+      midpoint: normalizeAirport(candidate.midpoint),
+      destination,
+      echoedCallsign: pickField(candidate, ['callsign', 'callsign_icao', 'callsign_iata']),
+      allCallsigns: [
+        pickField(candidate, ['callsign']),
+        pickField(candidate, ['callsign_icao']),
+        pickField(candidate, ['callsign_iata']),
+      ].filter(Boolean),
+    };
   }
   return null;
 }
 
-async function fetchRoute(callsign) {
+// A callsign→route database holds scheduled data, and callsigns get reused for
+// different city pairs on different days. A plane genuinely flying the route
+// sits roughly between its endpoints, so a wildly off-corridor position means
+// the mapping is stale — better to show nothing than the wrong pair.
+function routeIsPlausible(route, lat, lon) {
+  const legs = [route.origin, route.midpoint, route.destination].filter(
+    (a) => a && a.latitude != null && a.longitude != null
+  );
+  if (legs.length < 2) return true;
+
+  let direct = 0;
+  for (let i = 1; i < legs.length; i += 1) {
+    direct += haversineMiles(legs[i - 1].latitude, legs[i - 1].longitude, legs[i].latitude, legs[i].longitude);
+  }
+  const viaAircraft = Math.min(
+    ...legs.slice(1).map((leg, i) =>
+      haversineMiles(lat, lon, legs[i].latitude, legs[i].longitude) +
+      haversineMiles(lat, lon, leg.latitude, leg.longitude)
+    )
+  );
+  // Generous slack: real tracks wander, and aircraft hold, divert and vector.
+  return viaAircraft <= direct * 1.25 + 250;
+}
+
+async function fetchRoute(callsign, lat, lon) {
   const key = callsign.toUpperCase();
   const now = Date.now();
   const hit = routeCache.get(key);
-  if (hit && hit.expires > now) return hit.data;
+  let route = hit && hit.expires > now ? hit.data : undefined;
 
-  let route = null;
-  try {
-    const res = await fetch(`${ROUTE_API_URL}/${encodeURIComponent(key)}`, {
-      signal: AbortSignal.timeout(6000),
-      headers: { accept: 'application/json', 'user-agent': USER_AGENT },
-    });
-    // 404 is the documented "unknown callsign" answer, not an error worth surfacing.
-    if (res.ok) route = extractRoute(await res.json());
-  } catch {
+  if (route === undefined) {
     route = null;
+    try {
+      const res = await fetch(`${ROUTE_API_URL}/${encodeURIComponent(key)}`, {
+        signal: AbortSignal.timeout(6000),
+        headers: { accept: 'application/json', 'user-agent': USER_AGENT },
+      });
+      // 404 is the documented "unknown callsign" answer, not an error worth surfacing.
+      if (res.ok) route = extractRoute(await res.json());
+    } catch {
+      route = null;
+    }
+
+    // Guard against a lookup answering for a callsign other than the one asked for.
+    if (route?.allCallsigns.length && !route.allCallsigns.some((c) => String(c).toUpperCase() === key)) {
+      route = null;
+    }
+
+    if (routeCache.size >= ROUTE_CACHE_MAX) {
+      routeCache.delete(routeCache.keys().next().value);
+    }
+    routeCache.set(key, { expires: now + ROUTE_CACHE_TTL_MS, data: route });
   }
 
-  if (routeCache.size >= ROUTE_CACHE_MAX) {
-    routeCache.delete(routeCache.keys().next().value);
+  // Position-dependent, so it is checked per request rather than cached.
+  if (route && lat != null && lon != null && !routeIsPlausible(route, lat, lon)) {
+    return { ...route, suspect: true };
   }
-  routeCache.set(key, { expires: now + ROUTE_CACHE_TTL_MS, data: route });
   return route;
 }
 
@@ -231,7 +284,13 @@ async function handleRoute(req, res, query) {
     }
   }
 
-  sendJson(res, 200, { callsign, route: await fetchRoute(callsign) });
+  const lat = Number(query.get('lat'));
+  const lon = Number(query.get('lon'));
+  const hasPos = Number.isFinite(lat) && Number.isFinite(lon);
+  sendJson(res, 200, {
+    callsign,
+    route: await fetchRoute(callsign, hasPos ? lat : null, hasPos ? lon : null),
+  });
 }
 
 async function handleOverhead(req, res, query) {
@@ -326,7 +385,11 @@ async function handleOverhead(req, res, query) {
   // Only the nearest is shown on the card, so only it needs a route lookup.
   const nearest = states[0] || null;
   if (nearest?.callsign) {
-    nearest.route = await fetchRoute(nearest.callsign);
+    const route = await fetchRoute(nearest.callsign, nearest.latitude, nearest.longitude);
+    // A route that doesn't square with where the aircraft actually is stays in
+    // the payload, flagged, so it's inspectable — the card just won't show it.
+    nearest.route = route;
+    nearest.routeSuspect = Boolean(route?.suspect);
   }
 
   const payload = {
