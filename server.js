@@ -99,7 +99,22 @@ async function fetchFromProvider(provider, lat, lon, radiusNm) {
     throw new Error(`${provider.name} returned ${res.status}`);
   }
   const json = await res.json();
-  return Array.isArray(json.ac) ? json.ac : [];
+  const list = extractAircraftArray(json);
+  if (list === null) {
+    throw new Error(`${provider.name} returned an unrecognized shape (keys: ${Object.keys(json).join(',') || 'none'})`);
+  }
+  return list;
+}
+
+// These feeds are independent forks and don't agree on the wrapper key, so
+// treat "no recognized array" as a failure worth reporting rather than
+// letting a missing key quietly read as zero aircraft.
+function extractAircraftArray(json) {
+  if (Array.isArray(json)) return json;
+  for (const key of ['ac', 'aircraft', 'states', 'data', 'results']) {
+    if (Array.isArray(json?.[key])) return json[key];
+  }
+  return null;
 }
 
 async function handleOverhead(req, res, query) {
@@ -115,12 +130,54 @@ async function handleOverhead(req, res, query) {
 
   const cacheKey = `${lat.toFixed(2)},${lon.toFixed(2)},${radiusKm}`;
   const now = Date.now();
+  const debug = query.get('debug') === '1';
 
-  if (cache.key === cacheKey && cache.expires > now) {
+  if (!debug && cache.key === cacheKey && cache.expires > now) {
     return sendJson(res, 200, cache.data);
   }
 
   const radiusNm = Math.min(Math.round(radiusKm / KM_PER_NM), 250);
+
+  // Probes every provider and reports what each actually sent back, so a
+  // shape mismatch can be read off directly instead of inferred from a
+  // zero count.
+  if (debug) {
+    const probes = [];
+    for (const provider of PROVIDERS) {
+      const url = provider.urlFor(lat.toFixed(4), lon.toFixed(4), radiusNm);
+      try {
+        const probeRes = await fetch(url, {
+          signal: AbortSignal.timeout(10000),
+          headers: { accept: 'application/json' },
+        });
+        const body = await probeRes.text();
+        let topLevelKeys = null;
+        let arrayKey = null;
+        let sample = null;
+        try {
+          const parsed = JSON.parse(body);
+          topLevelKeys = Array.isArray(parsed) ? '(bare array)' : Object.keys(parsed);
+          const list = extractAircraftArray(parsed);
+          arrayKey = list === null ? null : 'recognized';
+          if (list && list.length) sample = list[0];
+        } catch {
+          topLevelKeys = '(not JSON)';
+        }
+        probes.push({
+          provider: provider.name,
+          url,
+          status: probeRes.status,
+          topLevelKeys,
+          recognizedArray: arrayKey !== null,
+          firstAircraft: sample,
+          bodyPreview: body.slice(0, 400),
+        });
+      } catch (err) {
+        probes.push({ provider: provider.name, url, error: String(err) });
+      }
+    }
+    return sendJson(res, 200, { debug: true, queried: { lat, lon, radiusKm, radiusNm }, probes });
+  }
 
   let aircraft = null;
   let usedProvider = null;
@@ -152,6 +209,7 @@ async function handleOverhead(req, res, query) {
   const payload = {
     queried: { lat, lon, radiusKm },
     provider: usedProvider,
+    providerFailures: failures,
     count: states.length,
     nearest: states[0] || null,
     nearby: states.slice(0, 5),
