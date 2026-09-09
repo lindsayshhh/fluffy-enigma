@@ -311,3 +311,9 @@ body {
   color: var(--text-muted);
   font-size: 0.9rem;
 }
+
+.finance-note {
+  color: var(--text-muted);
+  font-size: 0.87rem;
+  margin: 0 0 0.75rem;
+}

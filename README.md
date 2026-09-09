@@ -54,8 +54,13 @@ Edit `public/data/legislators.json`. Each entry looks like:
 ```
 
 Leave a field `null` if it isn't verified rather than guessing — the dashboard just omits
-that link/embed. The top-level `campaignFinanceSearchUrl` and `campaignFinanceNote` fields
-control the finance link shown for every member.
+that link/embed. The top-level `campaignFinanceSearchUrl`, `campaignFinanceHubUrl`, and
+`campaignFinanceNote` fields control the finance links shown for every member.
+
+Michigan has now migrated its campaign finance system twice, so if the search link breaks
+again, update `campaignFinanceSearchUrl` and leave `campaignFinanceHubUrl` pointing at the
+Department of State's disclosure page — that hub survives migrations and links to whatever
+the current tool is.
 
 ## Data
 

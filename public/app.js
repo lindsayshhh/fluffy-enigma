@@ -82,11 +82,6 @@ function escapeHtml(str) {
   }[c]));
 }
 
-function financeSearchLink(member) {
-  const url = META.campaignFinanceSearchUrl || 'https://mertsplus.michigan.gov/';
-  return url;
-}
-
 function openDetail(member) {
   const links = [];
   if (member.officialUrl) links.push({ label: 'Official Legislative Page', url: member.officialUrl });
@@ -95,8 +90,6 @@ function openDetail(member) {
   if (member.facebook) links.push({ label: 'Facebook', url: member.facebook });
   if (member.instagram) links.push({ label: 'Instagram', url: member.instagram });
   if (member.youtube) links.push({ label: 'YouTube', url: member.youtube });
-
-  const financeUrl = financeSearchLink(member);
 
   let embedsHtml = '';
   const handle = twitterHandle(member.twitter);
@@ -134,7 +127,17 @@ function openDetail(member) {
     </div>
     <div class="detail-links">
       ${links.map((l) => `<a class="link-btn" href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${l.label}</a>`).join('')}
-      <a class="link-btn primary" href="${escapeHtml(financeUrl)}" target="_blank" rel="noopener">Campaign Finance Reports</a>
+    </div>
+    <div class="embed-section">
+      <h3>Campaign finance</h3>
+      <p class="finance-note">
+        Open Committee Search, enter <strong>${escapeHtml(member.name.split(' ').pop())}</strong>, and open their
+        candidate committee to see filed statements, contributions, and expenditures.
+      </p>
+      <div class="detail-links">
+        <a class="link-btn primary" href="${escapeHtml(META.campaignFinanceSearchUrl)}" target="_blank" rel="noopener">Search MiTN committees</a>
+        ${META.campaignFinanceHubUrl ? `<a class="link-btn" href="${escapeHtml(META.campaignFinanceHubUrl)}" target="_blank" rel="noopener">Dept. of State disclosure page</a>` : ''}
+      </div>
     </div>
     <div class="embed-section">
       <h3>Social feed</h3>

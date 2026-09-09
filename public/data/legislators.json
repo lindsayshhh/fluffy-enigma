@@ -1,7 +1,8 @@
 {
   "generatedAt": "2026-09-09T00:00:00Z",
   "sources": [
-    "https://cfrsearch.nictusa.com/",
+    "https://mi-boe.entellitrak.com/etk-mi-boe-prod/page.request.do?page=page.miboeCommitteePublicSearch",
+    "https://www.michigan.gov/sos/elections/disclosure/mitn-information",
     "https://www.michigan.gov/sos/elections/disclosure/cfr/committee-search/intro/welcome-to-the-michigan-campaign-finance-searchable-database",
     "https://www.house.mi.gov/AllRepresentatives",
     "https://gophouse.org/members",
@@ -22,8 +23,8 @@
     "https://www.michiganvotes.org/",
     "Individual Ballotpedia, Wikipedia, gophouse.org/member/.../about, and misenategop.com pages for each legislator named below, plus each legislator's official x.com/twitter.com, facebook.com, and instagram.com pages as cited per-record"
   ],
-  "campaignFinanceSearchUrl": "https://cfrsearch.nictusa.com/",
-  "campaignFinanceNote": "Search by candidate name at the Michigan Campaign Finance Reporting (CFR) searchable database (cfrsearch.nictusa.com), run by the Michigan Bureau of Elections/Dept. of State: use the 'Committee Search' or 'Candidate/Committee Search' option, enter the candidate's last name (first name optional) and select the office/filer type, then open their committee to view filed campaign statements. The Dept. of State's disclosure landing page (michigan.gov/sos/elections/disclosure/cfr) links out to this same search tool and also has bulk data downloads.",
+  "campaignFinanceSearchUrl": "https://mi-boe.entellitrak.com/etk-mi-boe-prod/page.request.do?page=page.miboeCommitteePublicSearch",
+  "campaignFinanceNote": "Michigan campaign finance filings live in the Michigan Transparency Network (MiTN), run by the Bureau of Elections. Open Committee Search, enter the candidate's last name, and open their candidate committee to see filed statements, contributions, and expenditures. MiTN replaced the MERTS/CFR system (cfrsearch.nictusa.com), which has been decommissioned. If MiTN moves again, the Department of State's campaign finance disclosure page (campaignFinanceHubUrl) always links to the current tool.",
   "members": [
     {
       "name": "Alicia St. Germaine",
@@ -861,5 +862,6 @@
       "instagram": null,
       "youtube": null
     }
-  ]
+  ],
+  "campaignFinanceHubUrl": "https://www.michigan.gov/sos/elections/disclosure/cfr"
 }
