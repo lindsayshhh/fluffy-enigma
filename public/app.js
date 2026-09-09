@@ -86,39 +86,6 @@ function compassPoint(deg) {
   return COMPASS[Math.round(deg / 22.5) % 16];
 }
 
-function airportCode(airport) {
-  return airport ? airport.iata || airport.icao || '?' : '?';
-}
-
-function airportPlace(airport) {
-  return airport ? airport.municipality || airport.name || '' : '';
-}
-
-// A blank space can't say whether a route doesn't exist or was withheld, so
-// each outcome gets its own words.
-const ROUTE_NOTES = {
-  unknown: 'No route on file — charter and private flights usually have none',
-  suspect: 'Route on file doesn’t match this position',
-  unavailable: 'Route lookup unavailable',
-  unparsed: 'Route data couldn’t be read — this one’s a bug, not a missing route',
-};
-
-function routeHtml(route, status) {
-  const stops = route ? [route.origin, route.midpoint, route.destination].filter(Boolean) : [];
-
-  if (status === 'ok' && stops.length) {
-    const codes = stops.map(airportCode).join(' → ');
-    const places = stops.map(airportPlace);
-    const sub = places.every(Boolean) ? places.join(' → ') : '';
-    return `
-      <div class="spotted__route">${escapeHtml(codes)}</div>
-      ${sub ? `<div class="spotted__route-sub">${escapeHtml(sub)}</div>` : ''}`;
-  }
-
-  const note = ROUTE_NOTES[status];
-  return note ? `<div class="spotted__route-note">${escapeHtml(note)}</div>` : '';
-}
-
 function renderPlane(plane) {
   const callsign = (plane.callsign || '').trim() || (plane.icao24 || '').toUpperCase() || 'Unknown';
   const subtitle = plane.description
@@ -134,7 +101,6 @@ function renderPlane(plane) {
 
   const look = compassPoint(plane.bearingDeg);
   const identity = [plane.registration, plane.aircraftType, plane.year].filter(Boolean).join(' · ');
-  const route = routeHtml(plane.route, plane.routeStatus);
 
   // Out of the window: the aircraft itself, turned to its real heading.
   body.innerHTML = `
@@ -143,7 +109,6 @@ function renderPlane(plane) {
       <div class="spotted__label">
         <div class="spotted__callsign">${escapeHtml(callsign)}</div>
         <div class="spotted__desc">${escapeHtml(subtitle)}</div>
-        ${route}
       </div>
     </div>
   `;
