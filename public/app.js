@@ -14,14 +14,6 @@ function setFooter(text) {
   footerText.textContent = text;
 }
 
-function metersToFeet(m) {
-  return m == null ? null : Math.round(m * 3.28084);
-}
-
-function msToKmh(ms) {
-  return ms == null ? null : Math.round(ms * 3.6);
-}
-
 function fmt(value, unit, digits = 0) {
   if (value == null || Number.isNaN(value)) return '—';
   return `${value.toFixed(digits)} ${unit}`;
@@ -75,22 +67,20 @@ function renderEmpty() {
 }
 
 function renderPlane(plane) {
-  const callsign = (plane.callsign || '').trim() || plane.icao24.toUpperCase();
-  const altitudeM = plane.geoAltitude ?? plane.baroAltitude;
-  const altitudeFt = metersToFeet(altitudeM);
-  const speedKmh = msToKmh(plane.velocity);
-  const heading = plane.trueTrack ?? 0;
-  const verticalRate = plane.verticalRate;
+  const callsign = (plane.callsign || '').trim() || (plane.icao24 || '').toUpperCase() || 'Unknown';
+  const subtitle = [plane.aircraftType, plane.registration].filter(Boolean).join(' · ') || 'Type unknown';
+  const heading = plane.heading ?? 0;
+  const verticalRate = plane.verticalRateFtMin;
   let trend = 'level';
   if (verticalRate != null) {
-    if (verticalRate > 1) trend = 'climbing';
-    else if (verticalRate < -1) trend = 'descending';
+    if (verticalRate > 150) trend = 'climbing';
+    else if (verticalRate < -150) trend = 'descending';
   }
 
   render(`
     <div class="plane">
       <div class="plane__callsign">${escapeHtml(callsign)}</div>
-      <div class="plane__country">${escapeHtml(plane.originCountry || 'Unknown origin')}</div>
+      <div class="plane__country">${escapeHtml(subtitle)}</div>
 
       <div class="plane__compass">
         <span class="plane__arrow" style="transform: rotate(${heading}deg)">↑</span>
@@ -103,11 +93,11 @@ function renderPlane(plane) {
         </div>
         <div>
           <div class="stat__label">Altitude</div>
-          <div class="stat__value">${altitudeFt != null ? altitudeFt.toLocaleString() + ' ft' : '—'}</div>
+          <div class="stat__value">${plane.altitudeFt != null ? Math.round(plane.altitudeFt).toLocaleString() + ' ft' : '—'}</div>
         </div>
         <div>
           <div class="stat__label">Speed</div>
-          <div class="stat__value">${fmt(speedKmh, 'km/h')}</div>
+          <div class="stat__value">${fmt(plane.speedKmh, 'km/h')}</div>
         </div>
         <div>
           <div class="stat__label">Trend</div>
@@ -115,7 +105,7 @@ function renderPlane(plane) {
         </div>
         <div class="stat--wide">
           <div class="stat__label">ICAO24</div>
-          <div class="stat__value">${plane.icao24}</div>
+          <div class="stat__value">${plane.icao24 || '—'}</div>
         </div>
       </div>
     </div>

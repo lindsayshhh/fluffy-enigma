@@ -8,8 +8,17 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 
 const PORT = process.env.PORT || 3000;
 
-const OPENSKY_URL = 'https://opensky-network.org/api/states/all';
+// Free, keyless ADS-B aggregators (community-run tar1090/readsb forks).
+// OpenSky's anonymous REST API has become increasingly unreliable
+// (aggressive rate limits, pushing users toward registered OAuth clients),
+// so we use these instead — adsb.lol as a fallback if airplanes.live errors.
+const PROVIDERS = [
+  { name: 'airplanes.live', urlFor: (lat, lon, radiusNm) => `https://api.airplanes.live/v2/point/${lat}/${lon}/${radiusNm}` },
+  { name: 'adsb.lol', urlFor: (lat, lon, radiusNm) => `https://api.adsb.lol/v2/point/${lat}/${lon}/${radiusNm}` },
+];
+
 const EARTH_RADIUS_KM = 6371;
+const KM_PER_NM = 1.852;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -21,8 +30,7 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
 };
 
-// Simple in-memory cache so nearby/rapid requests don't hammer OpenSky's
-// generously-but-not-infinitely rate-limited anonymous API.
+// Simple in-memory cache so nearby/rapid requests don't hammer the upstream API.
 const CACHE_TTL_MS = 8000;
 let cache = { key: null, expires: 0, data: null };
 
@@ -39,30 +47,25 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
 }
 
-function boundingBox(lat, lon, radiusKm) {
-  const latDelta = radiusKm / 111;
-  const lonDelta = radiusKm / (111 * Math.cos(toRad(lat)) || 1);
+function rowToState(ac, lat, lon) {
+  if (typeof ac.lat !== 'number' || typeof ac.lon !== 'number') return null;
+  const onGround = ac.alt_baro === 'ground';
+  const altitudeFt = typeof ac.alt_baro === 'number' ? ac.alt_baro : null;
   return {
-    lamin: lat - latDelta,
-    lamax: lat + latDelta,
-    lomin: lon - lonDelta,
-    lomax: lon + lonDelta,
+    icao24: ac.hex,
+    callsign: (ac.flight || '').trim() || null,
+    aircraftType: ac.t || null,
+    registration: ac.r || null,
+    latitude: ac.lat,
+    longitude: ac.lon,
+    altitudeFt,
+    onGround,
+    speedKmh: typeof ac.gs === 'number' ? ac.gs * KM_PER_NM : null,
+    heading: typeof ac.track === 'number' ? ac.track : null,
+    verticalRateFtMin: typeof ac.baro_rate === 'number' ? ac.baro_rate : null,
+    squawk: ac.squawk || null,
+    distanceKm: haversineKm(lat, lon, ac.lat, ac.lon),
   };
-}
-
-const STATE_FIELDS = [
-  'icao24', 'callsign', 'originCountry', 'timePosition', 'lastContact',
-  'longitude', 'latitude', 'baroAltitude', 'onGround', 'velocity',
-  'trueTrack', 'verticalRate', 'sensors', 'geoAltitude', 'squawk',
-  'spi', 'positionSource', 'category',
-];
-
-function rowToState(row) {
-  const state = {};
-  STATE_FIELDS.forEach((field, i) => {
-    state[field] = row[i];
-  });
-  return state;
 }
 
 function sendJson(res, status, obj) {
@@ -72,6 +75,19 @@ function sendJson(res, status, obj) {
     'Content-Length': Buffer.byteLength(body),
   });
   res.end(body);
+}
+
+async function fetchFromProvider(provider, lat, lon, radiusNm) {
+  const url = provider.urlFor(lat.toFixed(4), lon.toFixed(4), radiusNm);
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(10000),
+    headers: { accept: 'application/json' },
+  });
+  if (!res.ok) {
+    throw new Error(`${provider.name} returned ${res.status}`);
+  }
+  const json = await res.json();
+  return Array.isArray(json.ac) ? json.ac : [];
 }
 
 async function handleOverhead(req, res, query) {
@@ -92,43 +108,41 @@ async function handleOverhead(req, res, query) {
     return sendJson(res, 200, cache.data);
   }
 
-  const bbox = boundingBox(lat, lon, radiusKm);
-  const upstreamUrl = new URL(OPENSKY_URL);
-  upstreamUrl.searchParams.set('lamin', bbox.lamin.toFixed(4));
-  upstreamUrl.searchParams.set('lamax', bbox.lamax.toFixed(4));
-  upstreamUrl.searchParams.set('lomin', bbox.lomin.toFixed(4));
-  upstreamUrl.searchParams.set('lomax', bbox.lomax.toFixed(4));
+  const radiusNm = Math.min(Math.round(radiusKm / KM_PER_NM), 250);
 
-  let upstream;
-  try {
-    upstream = await fetch(upstreamUrl, { signal: AbortSignal.timeout(10000) });
-  } catch (err) {
-    return sendJson(res, 502, { error: 'Could not reach OpenSky Network.', detail: String(err) });
+  let aircraft = null;
+  let usedProvider = null;
+  let lastError = null;
+
+  for (const provider of PROVIDERS) {
+    try {
+      aircraft = await fetchFromProvider(provider, lat, lon, radiusNm);
+      usedProvider = provider.name;
+      break;
+    } catch (err) {
+      lastError = err;
+    }
   }
 
-  if (upstream.status === 429) {
-    return sendJson(res, 429, { error: 'OpenSky rate limit reached. Try again shortly.' });
+  if (aircraft === null) {
+    return sendJson(res, 502, {
+      error: 'Could not reach any flight data provider.',
+      detail: String(lastError),
+    });
   }
-  if (!upstream.ok) {
-    return sendJson(res, 502, { error: `OpenSky returned ${upstream.status}.` });
-  }
 
-  const json = await upstream.json();
-  const rows = json.states || [];
-  const states = rows.map(rowToState).filter((s) => s.latitude != null && s.longitude != null && !s.onGround);
+  const states = aircraft
+    .map((ac) => rowToState(ac, lat, lon))
+    .filter((s) => s && !s.onGround);
 
-  const withDistance = states.map((s) => ({
-    ...s,
-    distanceKm: haversineKm(lat, lon, s.latitude, s.longitude),
-  }));
-
-  withDistance.sort((a, b) => a.distanceKm - b.distanceKm);
+  states.sort((a, b) => a.distanceKm - b.distanceKm);
 
   const payload = {
     queried: { lat, lon, radiusKm },
-    count: withDistance.length,
-    nearest: withDistance[0] || null,
-    nearby: withDistance.slice(0, 5),
+    provider: usedProvider,
+    count: states.length,
+    nearest: states[0] || null,
+    nearby: states.slice(0, 5),
     fetchedAt: new Date().toISOString(),
   };
 
