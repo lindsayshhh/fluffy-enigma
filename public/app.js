@@ -1,6 +1,9 @@
 const body = document.getElementById('body');
 const footerText = document.getElementById('footerText');
 const refreshBtn = document.getElementById('refreshBtn');
+const acarsSection = document.getElementById('acars');
+const acarsBody = document.getElementById('acarsBody');
+const acarsMeta = document.getElementById('acarsMeta');
 
 const POLL_INTERVAL_MS = 15000;
 let pollTimer = null;
@@ -118,6 +121,93 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+let acarsIdentity = null;
+let acarsFetchedAt = 0;
+
+function hideAcars() {
+  acarsSection.hidden = true;
+  acarsIdentity = null;
+}
+
+function renderAcarsNotice(text, meta = '') {
+  acarsMeta.textContent = meta;
+  acarsBody.innerHTML = `<p class="acars__empty">${escapeHtml(text)}</p>`;
+}
+
+function formatAcarsTime(value) {
+  if (value == null) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString();
+}
+
+function renderAcarsMessages(data) {
+  acarsMeta.textContent = `${data.count} message${data.count === 1 ? '' : 's'}`;
+  acarsBody.innerHTML = `
+    <div class="acars__list">
+      ${data.messages.map((msg) => `
+        <div class="acars__msg">
+          <div class="acars__msg-head">
+            <span>${escapeHtml(formatAcarsTime(msg.timestamp))}</span>
+            ${msg.label ? `<span class="acars__label">${escapeHtml(msg.label)}</span>` : ''}
+            ${msg.link ? `<span>${escapeHtml(msg.link)}</span>` : ''}
+            ${msg.station ? `<span>via ${escapeHtml(msg.station)}</span>` : ''}
+          </div>
+          <pre class="acars__text">${escapeHtml(msg.text)}</pre>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function loadAcars(plane) {
+  const flight = (plane.callsign || '').trim();
+  const reg = (plane.registration || '').trim();
+
+  if (!flight && !reg) {
+    hideAcars();
+    return;
+  }
+
+  const identity = `${flight}|${reg}`;
+  const now = Date.now();
+  if (identity === acarsIdentity && now - acarsFetchedAt < 60000) return;
+
+  acarsIdentity = identity;
+  acarsFetchedAt = now;
+  acarsSection.hidden = false;
+  renderAcarsNotice('Checking for recent messages…');
+
+  const params = new URLSearchParams();
+  if (flight) params.set('flight', flight);
+  if (reg) params.set('reg', reg);
+
+  try {
+    const res = await fetch(`/api/acars?${params}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      renderAcarsNotice(data.error || `Request failed (${res.status})`);
+      return;
+    }
+    if (data.configured === false) {
+      renderAcarsNotice(
+        'ACARS lookups are switched off. Set AIRFRAMES_API_KEY on the server to enable them.'
+      );
+      return;
+    }
+    if (!data.messages || data.count === 0) {
+      renderAcarsNotice(
+        'No recent messages heard for this aircraft. ACARS is only picked up where a volunteer receiver is listening, so most flights show nothing.',
+        '0 messages'
+      );
+      return;
+    }
+    renderAcarsMessages(data);
+  } catch (err) {
+    renderAcarsNotice(err.message || 'Could not load ACARS messages.');
+  }
+}
+
 async function fetchOverhead(lat, lon) {
   const url = `/api/overhead?lat=${lat}&lon=${lon}`;
   const res = await fetch(url);
@@ -137,12 +227,15 @@ async function poll() {
     if (data.nearest) {
       renderPlane(data.nearest);
       setFooter(`${data.count} aircraft nearby · updated ${new Date(data.fetchedAt).toLocaleTimeString()}`);
+      loadAcars(data.nearest);
     } else {
       renderEmpty();
+      hideAcars();
       setFooter(`Checked at ${new Date(data.fetchedAt).toLocaleTimeString()}`);
     }
   } catch (err) {
     renderError(err.message || 'Something went wrong.');
+    hideAcars();
     setFooter('Error fetching flight data');
   } finally {
     setTimeout(() => refreshBtn.classList.remove('spinning'), 400);

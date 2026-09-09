@@ -18,6 +18,17 @@ const PROVIDERS = [
   { name: 'adsb.fi', urlFor: (lat, lon, radiusNm) => `https://opendata.adsb.fi/api/v2/lat/${lat}/lon/${lon}/dist/${radiusNm}` },
 ];
 
+// ACARS has no keyless equivalent to the ADS-B feeds above. airframes.io
+// pools volunteer VHF/VDL2/HFDL/SATCOM receivers and is the only community
+// aggregator worth pointing at; it needs an account, so the section stays
+// switched off until AIRFRAMES_API_KEY is set. Coverage is inherently
+// patchy — an aircraft is only heard where someone is listening — so "no
+// recent messages" is a normal result, not a failure.
+const ACARS_API_URL = process.env.AIRFRAMES_API_URL || 'https://api.airframes.io/messages';
+const ACARS_API_KEY = process.env.AIRFRAMES_API_KEY || '';
+const ACARS_CACHE_TTL_MS = 20000;
+const ACARS_MAX_MESSAGES = 8;
+
 const EARTH_RADIUS_KM = 6371;
 const KM_PER_NM = 1.852;
 
@@ -151,6 +162,117 @@ async function handleOverhead(req, res, query) {
   sendJson(res, 200, payload);
 }
 
+let acarsCache = { key: null, expires: 0, data: null };
+
+function pick(obj, keys) {
+  for (const key of keys) {
+    const value = obj[key];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return null;
+}
+
+// The upstream field names aren't pinned down here, so read each field from
+// the first key that's actually present rather than assuming one spelling.
+function normalizeAcarsMessage(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const text = pick(raw, ['text', 'message_text', 'msg_text', 'message', 'data']);
+  const timestamp = pick(raw, ['timestamp', 'time', 'created_at', 'received_at', 't']);
+  return {
+    timestamp: typeof timestamp === 'number' && timestamp < 1e12 ? timestamp * 1000 : timestamp,
+    label: pick(raw, ['label', 'msg_label']),
+    text: typeof text === 'string' ? text : text == null ? null : JSON.stringify(text),
+    flight: pick(raw, ['flight', 'callsign', 'flight_number']),
+    registration: pick(raw, ['tail', 'registration', 'reg']),
+    station: pick(raw, ['station_id', 'station', 'ground_station', 'source']),
+    link: pick(raw, ['link_type', 'type', 'app_name', 'channel']),
+  };
+}
+
+function extractMessageArray(json) {
+  if (Array.isArray(json)) return json;
+  for (const key of ['messages', 'data', 'results', 'items']) {
+    if (Array.isArray(json?.[key])) return json[key];
+  }
+  return null;
+}
+
+async function handleAcars(req, res, query) {
+  const flight = (query.get('flight') || '').trim();
+  const reg = (query.get('reg') || '').trim();
+  const debug = query.get('debug') === '1';
+
+  if (!flight && !reg) {
+    return sendJson(res, 400, { error: 'A flight callsign or registration is required.' });
+  }
+
+  if (!ACARS_API_KEY) {
+    return sendJson(res, 200, {
+      configured: false,
+      messages: [],
+      note: 'Set AIRFRAMES_API_KEY to enable ACARS lookups.',
+    });
+  }
+
+  const cacheKey = `${flight}|${reg}`;
+  const now = Date.now();
+  if (!debug && acarsCache.key === cacheKey && acarsCache.expires > now) {
+    return sendJson(res, 200, acarsCache.data);
+  }
+
+  const url = new URL(ACARS_API_URL);
+  if (flight) url.searchParams.set('flight', flight);
+  if (reg) url.searchParams.set('registration', reg);
+  url.searchParams.set('limit', String(ACARS_MAX_MESSAGES));
+
+  let upstream;
+  try {
+    upstream = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: { accept: 'application/json', authorization: `Bearer ${ACARS_API_KEY}` },
+    });
+  } catch (err) {
+    return sendJson(res, 502, { configured: true, error: 'Could not reach the ACARS provider.', detail: String(err) });
+  }
+
+  if (!upstream.ok) {
+    return sendJson(res, 502, { configured: true, error: `ACARS provider returned ${upstream.status}.` });
+  }
+
+  const json = await upstream.json();
+  const rawMessages = extractMessageArray(json);
+
+  // Returns the untouched upstream body so an unfamiliar response shape can be
+  // inspected directly instead of silently normalizing to an empty list.
+  if (debug) {
+    return sendJson(res, 200, { configured: true, recognizedShape: rawMessages !== null, raw: json });
+  }
+
+  if (rawMessages === null) {
+    return sendJson(res, 502, {
+      configured: true,
+      error: 'Unrecognized response shape from the ACARS provider.',
+      hint: 'Re-request with &debug=1 to see the raw upstream payload.',
+    });
+  }
+
+  const messages = rawMessages
+    .map(normalizeAcarsMessage)
+    .filter((m) => m && m.text)
+    .slice(0, ACARS_MAX_MESSAGES);
+
+  const payload = {
+    configured: true,
+    queried: { flight: flight || null, registration: reg || null },
+    count: messages.length,
+    messages,
+    fetchedAt: new Date().toISOString(),
+  };
+
+  acarsCache = { key: cacheKey, expires: now + ACARS_CACHE_TTL_MS, data: payload };
+  sendJson(res, 200, payload);
+}
+
 function serveStatic(req, res, pathname) {
   let filePath = pathname === '/' ? '/index.html' : pathname;
   const resolved = path.normalize(path.join(PUBLIC_DIR, filePath));
@@ -176,6 +298,13 @@ const server = http.createServer((req, res) => {
 
   if (url.pathname === '/api/overhead') {
     handleOverhead(req, res, url.searchParams).catch((err) => {
+      sendJson(res, 500, { error: 'Unexpected server error.', detail: String(err) });
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/acars') {
+    handleAcars(req, res, url.searchParams).catch((err) => {
       sendJson(res, 500, { error: 'Unexpected server error.', detail: String(err) });
     });
     return;

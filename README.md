@@ -41,6 +41,23 @@ Returns the nearest airborne aircraft to the given coordinates within `radius` k
 }
 ```
 
+## ACARS messages (optional)
+
+The widget can show recent ACARS datalink messages for the aircraft overhead. This is off by default and needs an [airframes.io](https://airframes.io/) key:
+
+```bash
+AIRFRAMES_API_KEY=your-key npm start
+```
+
+`AIRFRAMES_API_URL` overrides the endpoint if it differs from the default.
+
+Two things to be realistic about:
+
+- **Most flights will show nothing.** ACARS is only received where a volunteer has a receiver listening, so empty results are the normal case, not an error. The widget says so rather than looking broken.
+- **The upstream response shape is not pinned down here.** Field names are read defensively (several spellings per field). If a real response doesn't parse, request `/api/acars?flight=XXX&debug=1` to see the raw upstream payload and adjust `normalizeAcarsMessage` in `server.js`.
+
+`GET /api/acars?flight=<callsign>&reg=<registration>` returns `{ configured, count, messages[] }`, where each message carries `timestamp`, `label`, `text`, `station` and `link`.
+
 ## Notes
 
 - Tries airplanes.live first, then adsb.lol if that fails — both are free community ADS-B feeds with no signup. The server caches responses per-location for 8 seconds to be a good citizen.
