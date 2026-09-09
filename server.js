@@ -170,6 +170,13 @@ function normalizeAirport(a) {
   };
 }
 
+// Some lookups answer 200 with a plain string rather than a 404 when they
+// don't know a callsign. That's a real "no route", not a parsing failure.
+function isExplicitlyUnknown(json) {
+  const body = typeof json === 'string' ? json : json?.response ?? json?.message;
+  return typeof body === 'string' && /unknown|not\s*found|no\s*route/i.test(body);
+}
+
 // Only the documented nestings — not the bare object, which could match
 // unrelated top-level keys and pass off junk as a route.
 function extractRoute(json) {
@@ -226,24 +233,33 @@ async function fetchRoute(callsign, lat, lon) {
   let entry = hit && hit.expires > now ? hit.data : undefined;
 
   if (entry === undefined) {
-    entry = { route: null, status: 'unknown' };
+    entry = { route: null, status: 'unavailable' };
     try {
       const res = await fetch(`${ROUTE_API_URL}/${encodeURIComponent(key)}`, {
         signal: AbortSignal.timeout(6000),
         headers: { accept: 'application/json', 'user-agent': USER_AGENT },
       });
-      if (res.ok) {
-        const route = extractRoute(await res.json());
-        // Guard against a lookup answering for a callsign other than the one asked for.
-        if (route?.allCallsigns.length && !route.allCallsigns.some((c) => String(c).toUpperCase() === key)) {
-          entry = { route: null, status: 'mismatch' };
-        } else if (route) {
-          entry = { route, status: 'ok' };
+
+      if (res.status === 404) {
+        entry = { route: null, status: 'unknown' };
+      } else if (res.ok) {
+        const json = await res.json();
+        const route = extractRoute(json);
+        if (route) {
+          // A regional flies under its own callsign (EDV5412) while the seat
+          // was sold under the mainline's (DL5412), so a differing echo is
+          // routine and not grounds to drop the route. The position check
+          // below is what actually catches a wrong pairing.
+          const echoMatches = !route.allCallsigns.length
+            || route.allCallsigns.some((c) => String(c).toUpperCase() === key);
+          entry = { route: { ...route, echoMatches }, status: 'ok' };
+        } else if (isExplicitlyUnknown(json)) {
+          entry = { route: null, status: 'unknown' };
+        } else {
+          // 200 with a structured body we couldn't read is a parsing failure
+          // here, not an absent route — never let it masquerade as "none".
+          entry = { route: null, status: 'unparsed', topLevelKeys: Object.keys(json || {}) };
         }
-      } else if (res.status !== 404) {
-        // 404 is the documented "no route for this callsign" answer; anything
-        // else means the lookup itself failed and may work on a later try.
-        entry = { route: null, status: 'unavailable' };
       }
     } catch {
       entry = { route: null, status: 'unavailable' };

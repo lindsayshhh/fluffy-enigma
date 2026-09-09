@@ -98,9 +98,9 @@ function airportPlace(airport) {
 // each outcome gets its own words.
 const ROUTE_NOTES = {
   unknown: 'No route on file — charter and private flights usually have none',
-  mismatch: 'Route lookup returned a different flight',
   suspect: 'Route on file doesn’t match this position',
   unavailable: 'Route lookup unavailable',
+  unparsed: 'Route data couldn’t be read — this one’s a bug, not a missing route',
 };
 
 function routeHtml(route, status) {
