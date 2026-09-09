@@ -15,6 +15,7 @@ const PORT = process.env.PORT || 3000;
 const PROVIDERS = [
   { name: 'airplanes.live', urlFor: (lat, lon, radiusNm) => `https://api.airplanes.live/v2/point/${lat}/${lon}/${radiusNm}` },
   { name: 'adsb.lol', urlFor: (lat, lon, radiusNm) => `https://api.adsb.lol/v2/point/${lat}/${lon}/${radiusNm}` },
+  { name: 'adsb.fi', urlFor: (lat, lon, radiusNm) => `https://opendata.adsb.fi/api/v2/lat/${lat}/lon/${lon}/dist/${radiusNm}` },
 ];
 
 const EARTH_RADIUS_KM = 6371;
@@ -112,7 +113,7 @@ async function handleOverhead(req, res, query) {
 
   let aircraft = null;
   let usedProvider = null;
-  let lastError = null;
+  const failures = [];
 
   for (const provider of PROVIDERS) {
     try {
@@ -120,14 +121,14 @@ async function handleOverhead(req, res, query) {
       usedProvider = provider.name;
       break;
     } catch (err) {
-      lastError = err;
+      failures.push({ provider: provider.name, reason: err.message || String(err) });
     }
   }
 
   if (aircraft === null) {
     return sendJson(res, 502, {
       error: 'Could not reach any flight data provider.',
-      detail: String(lastError),
+      failures,
     });
   }
 

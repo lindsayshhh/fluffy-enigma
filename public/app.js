@@ -123,7 +123,8 @@ async function fetchOverhead(lat, lon) {
   const res = await fetch(url);
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error || `Request failed (${res.status})`);
+    const detail = (data.failures || []).map((f) => `${f.provider}: ${f.reason}`).join('; ');
+    throw new Error(detail ? `${data.error} (${detail})` : data.error || `Request failed (${res.status})`);
   }
   return data;
 }
