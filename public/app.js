@@ -13,6 +13,7 @@ const detailBody = document.getElementById('detail-body');
 const detailClose = document.getElementById('detail-close');
 
 let state = { chamber: 'All', query: '', sort: 'name' };
+let newsToken = 0;
 
 function twitterHandle(url) {
   if (!url) return null;
@@ -82,6 +83,60 @@ function escapeHtml(str) {
   }[c]));
 }
 
+function relativeDate(value) {
+  if (!value) return '';
+  const then = new Date(value);
+  if (Number.isNaN(then.getTime())) return '';
+  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 30) return `${days} days ago`;
+  return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function googleNewsSearchUrl(member) {
+  return 'https://news.google.com/search?q=' + encodeURIComponent(`"${member.name}" Michigan`);
+}
+
+async function loadNews(member) {
+  const block = document.getElementById('news-block');
+  const token = ++newsToken;
+
+  const fallback = `<a class="link-btn" href="${escapeHtml(googleNewsSearchUrl(member))}" target="_blank" rel="noopener">Search Google News</a>`;
+
+  let data;
+  try {
+    const params = new URLSearchParams({ name: member.name, chamber: member.chamber });
+    const res = await fetch(`/api/news?${params}`);
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  } catch (err) {
+    if (token !== newsToken || !document.getElementById('news-block')) return;
+    block.innerHTML = `<p class="news-status">Couldn't load coverage right now.</p><div class="detail-links">${fallback}</div>`;
+    return;
+  }
+
+  // A newer panel opened while this request was in flight.
+  if (token !== newsToken || !document.getElementById('news-block')) return;
+
+  if (!data.items.length) {
+    block.innerHTML = `<p class="news-status">No recent coverage found.</p><div class="detail-links">${fallback}</div>`;
+    return;
+  }
+
+  block.innerHTML = `
+    <ol class="news-list">
+      ${data.items.map((item) => `
+        <li>
+          <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
+          <span class="news-meta">${escapeHtml([item.source, relativeDate(item.publishedAt)].filter(Boolean).join(' · '))}</span>
+        </li>
+      `).join('')}
+    </ol>
+    <div class="detail-links">${fallback}</div>
+  `;
+}
+
 function openDetail(member) {
   const links = [];
   if (member.officialUrl) links.push({ label: 'Official Legislative Page', url: member.officialUrl });
@@ -129,21 +184,16 @@ function openDetail(member) {
       ${links.map((l) => `<a class="link-btn" href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${l.label}</a>`).join('')}
     </div>
     <div class="embed-section">
-      <h3>Campaign finance</h3>
-      <p class="finance-note">
-        Open Committee Search, enter <strong>${escapeHtml(member.name.split(' ').pop())}</strong>, and open their
-        candidate committee to see filed statements, contributions, and expenditures.
-      </p>
-      <div class="detail-links">
-        <a class="link-btn primary" href="${escapeHtml(META.campaignFinanceSearchUrl)}" target="_blank" rel="noopener">Search MiTN committees</a>
-        ${META.campaignFinanceHubUrl ? `<a class="link-btn" href="${escapeHtml(META.campaignFinanceHubUrl)}" target="_blank" rel="noopener">Dept. of State disclosure page</a>` : ''}
-      </div>
+      <h3>Recent coverage</h3>
+      <div id="news-block" class="news-block"><p class="news-status">Loading recent coverage…</p></div>
     </div>
     <div class="embed-section">
       <h3>Social feed</h3>
       ${embedsHtml}
     </div>
   `;
+
+  loadNews(member);
 
   overlay.hidden = false;
   document.body.style.overflow = 'hidden';
@@ -221,7 +271,7 @@ async function init() {
   }
 
   if (META.generatedAt) {
-    dataMeta.textContent = `Data compiled ${new Date(META.generatedAt).toLocaleDateString()} from official Michigan legislature, caucus, and campaign finance sources.`;
+    dataMeta.textContent = `Roster compiled ${new Date(META.generatedAt).toLocaleDateString()} from official Michigan legislature and caucus sources.`;
   } else {
     dataMeta.textContent = 'Data not yet loaded.';
   }

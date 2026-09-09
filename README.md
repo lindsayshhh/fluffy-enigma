@@ -1,25 +1,39 @@
 # Michigan GOP Legislature Dashboard
 
 A dashboard of every Republican member of the Michigan State House of Representatives and
-Michigan State Senate, in one place: official contact pages, social media, and a direct link
-to each member's campaign finance filings on the state's own disclosure system.
+Michigan State Senate, in one place: official contact pages, social media, and recent news
+coverage of each member.
 
 ## How it works
 
-- A small static Node server serves the frontend — no build step, no framework, no API keys.
+- A small Node server serves the frontend and one API route — no build step, no framework,
+  no API keys.
 - Member data (name, district, chamber, official page, and any social accounts found) lives in
   [`public/data/legislators.json`](public/data/legislators.json), compiled from official
   Michigan House/Senate and caucus sources.
 - The dashboard lets you filter by chamber, search by name or district, and open a member's
   detail panel.
-- The detail panel embeds a **live** X/Twitter timeline (via `platform.twitter.com/widgets.js`)
+- **Recent coverage** is fetched live when you open a member. The browser can't read Google
+  News directly (CORS), so the server proxies it: `GET /api/news?name=…&chamber=…` fetches
+  that member's Google News RSS search, parses the items, and returns JSON. Headlines link
+  straight to the publications. Results are cached in memory for 15 minutes per member.
+- The detail panel also embeds a **live** X/Twitter timeline (via `platform.twitter.com/widgets.js`)
   and a **live** Facebook Page feed (via the Facebook Page Plugin) directly from the member's
   own public accounts when available — no API keys required for either. Instagram/YouTube are
   linked out to directly, since there's no key-free way to embed a live feed for those.
-- Campaign finance reports are **not** stored or restated in this app. Instead, every member
-  links to Michigan's official Bureau of Elections campaign finance disclosure search, so
-  what you see is always the current, authoritative filing — not a number that can go stale
-  or be transcribed wrong.
+
+### Tuning the news search
+
+The query is built in `newsQuery()` in [`server.js`](server.js) as
+`"Full Name" Michigan (representative|senator OR legislature OR Lansing)`. The Michigan and
+role terms keep common names (there are several David Martins in the news) from pulling in
+unrelated people. Loosen it for more results, tighten it for more precision.
+
+Set `NEWS_FEED_BASE` to point at a different RSS search endpoint or a local fixture:
+
+```bash
+NEWS_FEED_BASE=http://localhost:4100/rss npm start
+```
 
 ## Run it
 
@@ -54,13 +68,7 @@ Edit `public/data/legislators.json`. Each entry looks like:
 ```
 
 Leave a field `null` if it isn't verified rather than guessing — the dashboard just omits
-that link/embed. The top-level `campaignFinanceSearchUrl`, `campaignFinanceHubUrl`, and
-`campaignFinanceNote` fields control the finance links shown for every member.
-
-Michigan has now migrated its campaign finance system twice, so if the search link breaks
-again, update `campaignFinanceSearchUrl` and leave `campaignFinanceHubUrl` pointing at the
-Department of State's disclosure page — that hub survives migrations and links to whatever
-the current tool is.
+that link/embed.
 
 ## Data
 
