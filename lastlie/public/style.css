@@ -31,6 +31,22 @@ main { max-width: 44rem; margin: 0 auto; width: 100%; }
 .loading, .error { color: var(--muted); font-size: 1rem; }
 .error a { color: var(--accent); }
 
+.hero { display: block; }
+
+.toon { margin: 0 0 1.5rem; }
+
+.toon-svg {
+  display: block;
+  width: 6rem;
+  height: auto;
+  overflow: visible;
+}
+
+@media (min-width: 42rem) {
+  .toon-svg { width: 7.5rem; }
+}
+
+
 .eyebrow {
   display: flex;
   align-items: center;
@@ -141,6 +157,30 @@ summary:hover { color: var(--text); }
     --muted: #6b7280;
     --accent: #c62b30;
   }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .toon-body {
+    transform-box: fill-box;
+    transform-origin: 50% 90%;
+    animation: yell 0.5s ease-in-out infinite alternate;
+  }
+
+  .toon-shout {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: shout 0.5s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes yell {
+  from { transform: rotate(-1.3deg) translateY(0.6px); }
+  to   { transform: rotate(1.3deg) translateY(-0.6px); }
+}
+
+@keyframes shout {
+  from { opacity: 0.3; transform: scale(0.9); }
+  to   { opacity: 0.95; transform: scale(1.06); }
 }
 
 @media (prefers-reduced-motion: no-preference) {

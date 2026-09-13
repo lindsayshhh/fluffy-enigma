@@ -21,6 +21,19 @@ says so, and shows how old the top entry is. For live listings, see
 [PolitiFact](https://www.politifact.com/personalities/donald-trump/) and
 [FactCheck.org](https://www.factcheck.org/).
 
+
+## The cartoon
+
+The yelling caricature at the top of the page is hand-drawn inline SVG living in
+`public/index.html` — no image files, no dependencies, and it stays sharp at any
+size. It's an editorial-style caricature (the swoop, the squint, the tanning-
+goggle patches, the overlong tie), drawn to be silly rather than grotesque.
+
+It shakes and its shout lines pulse via CSS, both wrapped in
+`prefers-reduced-motion: no-preference` so the whole thing holds still for
+anyone who asked for less motion. The `aria-label` on the `<svg>` describes it
+for screen readers.
+
 ## Run it
 
 ```bash
