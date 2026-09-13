@@ -50,6 +50,13 @@ Returns the nearest airborne aircraft to the given coordinates within `radius` m
 }
 ```
 
+## Also in this repo
+
+[`lastlie/`](lastlie/) — **The Last Lie**, a separate single-page site that shows
+the most recent fact-checked false claim by Donald Trump, with a link to the
+fact-check. Run it with `npm run start:lastlie` (port 3100). It shares no code
+with the widget above; see [lastlie/README.md](lastlie/README.md).
+
 ## Notes
 
 - Tries adsb.fi first, then adsb.lol — both free community ADS-B feeds, no signup. The server caches responses per-location for 8 seconds to be a good citizen.

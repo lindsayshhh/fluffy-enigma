@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Last Lie</title>
+<meta name="description" content="The most recent claim by Donald Trump that a news organization has published a fact-check on, with a link to the fact-check.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="stage" aria-live="polite">
+  <p class="loading">Loading…</p>
+</main>
+
+<template id="tpl-latest">
+  <p class="eyebrow"><span class="dot" aria-hidden="true"></span><span data-slot="eyebrow"></span></p>
+  <blockquote class="claim" data-slot="claim"></blockquote>
+  <p class="attribution"><span data-slot="venue"></span><span class="sep" aria-hidden="true">·</span><time data-slot="date"></time></p>
+  <section class="reality">
+    <h2>What's actually true</h2>
+    <p data-slot="reality"></p>
+    <p class="source">Fact-checked by <a data-slot="source" rel="noopener noreferrer" target="_blank"></a></p>
+  </section>
+</template>
+
+<footer>
+  <details id="archive">
+    <summary>Earlier entries</summary>
+    <ol id="archive-list"></ol>
+  </details>
+  <p class="disclaimer" id="disclaimer"></p>
+</footer>
+
+<script src="app.js" type="module"></script>
+</body>
+</html>

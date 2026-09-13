@@ -1,0 +1,59 @@
+{
+  "subject": "Donald Trump",
+  "updated": "2026-09-13",
+  "note": "Every entry is a claim a named news organization published a fact-check on, with a link to that fact-check. Claims are given as reported speech with the fact-checkers' verbatim quoted fragments preserved; nothing here is a reconstructed quote.",
+  "entries": [
+    {
+      "id": "2026-09-10-empty-seats",
+      "date": "2026-09-10",
+      "rating": "False",
+      "claim": "Said there were “no empty seats” in the arena as he spoke.",
+      "venue": "Republican midterm convention, night 2, Dallas",
+      "reality": "There plainly were. Reporters in the hall described rows of empty seats, empty upper decks and sparsely filled side sections; one estimate put attendance around 65–70% when he arrived, and NBC News reported people leaving as the speech passed 90 minutes.",
+      "source": {
+        "name": "CNN",
+        "title": "Fact check: Trump, RFK Jr. and others make false claims on night 2 of GOP convention",
+        "url": "https://www.cnn.com/2026/09/10/politics/fact-check-republican-midterm-convention-night-2"
+      }
+    },
+    {
+      "id": "2026-09-09-prices-going-down",
+      "date": "2026-09-09",
+      "rating": "False",
+      "claim": "Said prices on “almost every item” are rapidly going down.",
+      "venue": "Republican midterm convention speech, Dallas",
+      "reality": "Prices were still rising. CPI data showed inflation running about 3.4%, with far more products getting more expensive than cheaper. Since he took office, food prices were up 4.3% and grocery prices 3.4%, both still climbing.",
+      "source": {
+        "name": "CNN",
+        "title": "Fact check: Trump makes numerous false claims in Republican convention speech",
+        "url": "https://www.cnn.com/2026/09/09/politics/fact-check-republican-midterm-convention-night-1"
+      }
+    },
+    {
+      "id": "2026-09-09-every-single-promise",
+      "date": "2026-09-09",
+      "rating": "False",
+      "claim": "Claimed he had kept “every single promise” he made on the campaign trail.",
+      "venue": "Republican midterm convention speech, Dallas",
+      "reality": "Several remain unmet, including ending the war in Ukraine within 24 hours of taking office, quickly taming inflation, and — dating to 2016 — making Mexico pay for a border wall.",
+      "source": {
+        "name": "CNN",
+        "title": "Fact check: Trump makes numerous false claims in Republican convention speech",
+        "url": "https://www.cnn.com/2026/09/09/politics/fact-check-republican-midterm-convention-night-1"
+      }
+    },
+    {
+      "id": "2026-09-09-11888-murderers",
+      "date": "2026-09-09",
+      "rating": "False",
+      "claim": "Said Democrats allowed “11,888 murderers” into the country.",
+      "venue": "Republican midterm convention speech, Dallas",
+      "reality": "The figure counts non-citizens recorded across multiple decades and multiple administrations — including people convicted of homicide after they arrived — not people admitted under the previous administration.",
+      "source": {
+        "name": "CNN",
+        "title": "Fact check: Trump makes numerous false claims in Republican convention speech",
+        "url": "https://www.cnn.com/2026/09/09/politics/fact-check-republican-midterm-convention-night-1"
+      }
+    }
+  ]
+}

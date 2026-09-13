@@ -5,3 +5,9 @@ services:
     plan: free
     buildCommand: "true"
     startCommand: npm start
+  - type: web
+    name: lastlie
+    runtime: node
+    plan: free
+    buildCommand: "true"
+    startCommand: npm run start:lastlie
