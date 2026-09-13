@@ -1,9 +1,13 @@
 :root {
-  /* The room the set is sitting in — this is the only part that follows
-     the viewer's light/dark preference. A CRT is dark no matter what. */
-  --room: #101013;
-  --room-glow: #1c1c22;
+  /* The room the set is sitting in — the only part that follows the viewer's
+     colour scheme. Bare :root is the light room; the blocks below swap it. */
+  --room: #d9d3c7;
+  --room-glow: #efeae0;
+  --note: #4b453a;
+  --note-strong: #201c16;
+  --note-rule: rgba(0, 0, 0, 0.18);
 
+  /* The set itself never changes: a CRT is dark in any room. */
   --cabinet: #35291d;
   --cabinet-hi: #4a3a29;
   --cabinet-lo: #221a12;
@@ -18,11 +22,24 @@
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --room: #d9d3c7;
-    --room-glow: #efeae0;
+/* Dark room for a dark OS, unless the viewer explicitly asked for light. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --room: #101013;
+    --room-glow: #1c1c22;
+    --note: #a49a86;
+    --note-strong: #f2e8d5;
+    --note-rule: rgba(255, 255, 255, 0.12);
   }
+}
+
+/* An explicit dark choice wins over a light OS. */
+:root[data-theme="dark"] {
+  --room: #101013;
+  --room-glow: #1c1c22;
+  --note: #a49a86;
+  --note-strong: #f2e8d5;
+  --note-rule: rgba(255, 255, 255, 0.12);
 }
 
 * { box-sizing: border-box; }
@@ -35,7 +52,9 @@ body {
   justify-content: center;
   gap: 2.5rem;
   padding: clamp(1.25rem, 4vw, 3.5rem) clamp(1rem, 4vw, 3rem);
-  background: radial-gradient(ellipse at 50% 30%, var(--room-glow), var(--room) 70%);
+  /* Opaque colour under the gradient so the ground is painted either way. */
+  background-color: var(--room);
+  background-image: radial-gradient(ellipse at 50% 30%, var(--room-glow), var(--room) 70%);
   color: var(--text);
   font-family: var(--mono);
   line-height: 1.6;
@@ -230,7 +249,7 @@ footer {
   max-width: 48rem;
   margin: 0 auto;
   font-size: 0.75rem;
-  color: var(--muted);
+  color: var(--note);
 }
 
 summary {
@@ -241,7 +260,7 @@ summary {
   font-size: 0.7rem;
 }
 
-summary:hover { color: var(--text); }
+summary:hover { color: var(--note-strong); }
 
 #archive-list {
   margin: 0.75rem 0 1.5rem;
@@ -250,22 +269,15 @@ summary:hover { color: var(--text); }
   gap: 0.9rem;
 }
 
-#archive-list .a-claim { color: var(--text); }
-#archive-list a { color: var(--muted); }
+#archive-list .a-claim { color: var(--note-strong); }
+#archive-list a { color: var(--note); }
 #archive-list a:hover { color: var(--amber); }
 
 .disclaimer {
   margin: 0;
   padding-top: 1.1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid var(--note-rule);
   line-height: 1.6;
-}
-
-@media (prefers-color-scheme: light) {
-  footer { color: #4b453a; }
-  #archive-list .a-claim { color: #201c16; }
-  #archive-list a { color: #4b453a; }
-  .disclaimer { border-top-color: rgba(0, 0, 0, 0.18); }
 }
 
 /* ---------- motion ---------- */

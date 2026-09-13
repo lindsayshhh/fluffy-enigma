@@ -93,12 +93,21 @@ function renderError(message) {
   stage.replaceChildren(p);
 }
 
+// Served by the Node app, the dataset comes from its API. The standalone
+// build has no server, so there it ships inlined in the page instead.
+async function readDataset() {
+  const inline = document.getElementById('dataset');
+  if (inline) return JSON.parse(inline.textContent);
+
+  const res = await fetch('api/lies');
+  if (!res.ok) throw new Error(`server returned ${res.status}`);
+  return res.json();
+}
+
 async function load() {
   let data;
   try {
-    const res = await fetch('api/lies');
-    if (!res.ok) throw new Error(`server returned ${res.status}`);
-    data = await res.json();
+    data = await readDataset();
   } catch (err) {
     renderError(`Couldn't load the fact-check data (${err.message}).`);
     return;

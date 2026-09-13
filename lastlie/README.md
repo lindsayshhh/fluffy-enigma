@@ -81,6 +81,26 @@ required — the server refuses to start without them, so a missing citation
 fails loudly instead of rendering an unsourced accusation. The file is re-read
 whenever it changes, so edits show up without a restart.
 
+
+## Publishing a standalone copy
+
+```bash
+npm run build:lastlie
+```
+
+Bundles everything into `lastlie/dist/` (gitignored) with the CSS, JS and the
+dataset all inlined, so the page needs no server:
+
+- `index.html` — a complete document for any static host.
+- `fragment.html` — the same page without the document scaffolding, which is
+  the shape claude.ai Artifacts expect.
+
+`dataset.js` is the single source of truth for reading, validating and sorting
+the entries; both the server and the build import it, so a standalone copy can
+never disagree with the served site or skip the citation check. The page reads
+the inlined dataset when one is present and falls back to the API otherwise, so
+the same `app.js` drives both.
+
 ## API
 
 - `GET /api/latest` — metadata plus the single newest entry.
