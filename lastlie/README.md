@@ -22,17 +22,26 @@ says so, and shows how old the top entry is. For live listings, see
 [FactCheck.org](https://www.factcheck.org/).
 
 
-## The cartoon
+## The look
 
-The yelling caricature at the top of the page is hand-drawn inline SVG living in
-`public/index.html` — no image files, no dependencies, and it stays sharp at any
-size. It's an editorial-style caricature (the swoop, the squint, the tanning-
-goggle patches, the overlong tie), drawn to be silly rather than grotesque.
+The page is styled as an old television set: a wood-grain cabinet with a
+speaker grille and knobs, wrapped around a curved CRT screen showing the claim
+as a broadcast. On-screen there's a channel number, a blinking on-air light, a
+date stamp, and the correction sits in a red chyron tab like a lower third.
+Everything is monospaced, the way broadcast captions were.
 
-It shakes and its shout lines pulse via CSS, both wrapped in
-`prefers-reduced-motion: no-preference` so the whole thing holds still for
-anyone who asked for less motion. The `aria-label` on the `<svg>` describes it
-for screen readers.
+The CRT effects are all CSS — no images. Scanlines are a repeating gradient,
+the bulge comes from elliptical border-radii, the corner falloff and glass
+highlight are layered radial gradients, and the headline carries a one-pixel
+red/blue text-shadow standing in for a misregistered picture tube.
+
+The screen powers on with a scaleY flash, a highlight band rolls slowly down
+the glass, and the on-air light blinks. All of it lives inside
+`prefers-reduced-motion: no-preference`, and the roll band is `display: none`
+outside that block so it doesn't park mid-screen when animation is off.
+
+The cabinet stays dark in both colour schemes, since a CRT is dark regardless.
+Only the room behind it follows the viewer's light/dark preference.
 
 ## Run it
 

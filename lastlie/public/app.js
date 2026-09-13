@@ -23,6 +23,12 @@ function relative(isoDate) {
   return `${years} year${years === 1 ? '' : 's'} ago`;
 }
 
+// Broadcast-style stamp for the on-screen clock: 09·10·26
+function shortDate(isoDate) {
+  const [y, m, d] = isoDate.split('-');
+  return `${m}\u00b7${d}\u00b7${y.slice(2)}`;
+}
+
 function longDate(isoDate) {
   const [y, m, d] = isoDate.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, {
@@ -43,6 +49,7 @@ function renderLatest(entry, subject) {
   fill(node, 'claim', entry.claim);
   fill(node, 'venue', entry.venue || 'Public remarks');
   fill(node, 'reality', entry.reality);
+  fill(node, 'clock', shortDate(entry.date));
 
   const time = fill(node, 'date', `${longDate(entry.date)} — ${relative(entry.date)}`);
   time.dateTime = entry.date;

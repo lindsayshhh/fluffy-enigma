@@ -1,12 +1,28 @@
 :root {
-  --bg: #0e0f12;
-  --surface: #16181d;
-  --line: #2a2e37;
-  --text: #f2f3f5;
-  --muted: #9aa1ae;
-  --accent: #e5484d;
-  --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
-  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* The room the set is sitting in — this is the only part that follows
+     the viewer's light/dark preference. A CRT is dark no matter what. */
+  --room: #101013;
+  --room-glow: #1c1c22;
+
+  --cabinet: #35291d;
+  --cabinet-hi: #4a3a29;
+  --cabinet-lo: #221a12;
+
+  --screen: #0b0f0d;
+  --screen-edge: #050706;
+  --text: #f2e8d5;
+  --muted: #a49a86;
+  --amber: #f0c14b;
+  --accent: #e2412f;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --room: #d9d3c7;
+    --room-glow: #efeae0;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -17,177 +33,267 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 3rem;
-  padding: clamp(1.5rem, 5vw, 5rem) clamp(1.25rem, 6vw, 3rem);
-  background: var(--bg);
+  gap: 2.5rem;
+  padding: clamp(1.25rem, 4vw, 3.5rem) clamp(1rem, 4vw, 3rem);
+  background: radial-gradient(ellipse at 50% 30%, var(--room-glow), var(--room) 70%);
   color: var(--text);
-  font-family: var(--sans);
+  font-family: var(--mono);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
-main { max-width: 44rem; margin: 0 auto; width: 100%; }
+/* ---------- the set ---------- */
 
-.loading, .error { color: var(--muted); font-size: 1rem; }
+.tv {
+  width: 100%;
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: clamp(0.75rem, 2.5vw, 1.25rem);
+  border-radius: clamp(1rem, 3vw, 1.75rem);
+  background: linear-gradient(165deg, var(--cabinet-hi), var(--cabinet) 45%, var(--cabinet-lo));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.14) inset,
+    0 -2px 6px rgba(0, 0, 0, 0.5) inset,
+    0 30px 60px -20px rgba(0, 0, 0, 0.7);
+}
+
+.screen {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  /* Elliptical radii give the glass its bulge without a wrapper element. */
+  border-radius: 6% 6% 6% 6% / 4% 4% 4% 4%;
+  background:
+    radial-gradient(ellipse at 50% 45%, #121815 0%, var(--screen) 55%, var(--screen-edge) 100%);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.85),
+    0 0 0 4px rgba(255, 255, 255, 0.05),
+    0 0 70px rgba(0, 0, 0, 0.9) inset;
+}
+
+.scanlines,
+.glare,
+.roll {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.scanlines {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.22) 0 1px,
+    transparent 1px 3px
+  );
+  opacity: 0.55;
+}
+
+/* Corner falloff plus a soft highlight across the top of the glass. */
+.glare {
+  background:
+    radial-gradient(ellipse at 28% 12%, rgba(255, 255, 255, 0.07), transparent 45%),
+    radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.roll { display: none; background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.035), transparent); height: 22%; inset: auto 0 auto 0; }
+
+/* ---------- broadcast ---------- */
+
+.broadcast { position: relative; z-index: 1; }
+
+.loading,
+.error { margin: 0; color: var(--amber); font-size: 0.9rem; }
 .error a { color: var(--accent); }
 
-.hero { display: block; }
-
-.toon { margin: 0 0 1.5rem; }
-
-.toon-svg {
-  display: block;
-  width: 6rem;
-  height: auto;
-  overflow: visible;
-}
-
-@media (min-width: 42rem) {
-  .toon-svg { width: 7.5rem; }
-}
-
-
-.eyebrow {
+.status {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin: 0 0 1.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed rgba(240, 193, 75, 0.35);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--amber);
 }
 
-.dot {
+.live { display: inline-flex; align-items: center; gap: 0.4rem; }
+.clock { margin-left: auto; }
+
+.rec {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
   background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
   flex: none;
 }
 
-.claim {
-  margin: 0;
-  font-family: var(--serif);
-  font-size: clamp(1.75rem, 5.5vw, 3.25rem);
-  line-height: 1.18;
-  letter-spacing: -0.015em;
-  text-wrap: balance;
-}
-
-.attribution {
-  margin: 1.5rem 0 0;
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-
-.sep { margin: 0 0.5rem; }
-
-.reality {
-  margin-top: 2.75rem;
-  padding: 1.5rem;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  border-radius: 0.5rem;
-  background: var(--surface);
-}
-
-.reality h2 {
-  margin: 0 0 0.6rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+.eyebrow {
+  margin: 0 0 1rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-.reality p { margin: 0; }
+.claim {
+  margin: 0;
+  font-size: clamp(1.2rem, 3.6vw, 2rem);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  text-wrap: balance;
+  /* Faint RGB fringing, the way a CRT misregisters its guns. Kept to a
+     single subpixel so the text stays crisp rather than blurred. */
+  text-shadow: 1px 0 rgba(226, 65, 47, 0.4), -1px 0 rgba(90, 190, 255, 0.32);
+}
 
-.source {
-  margin-top: 1rem !important;
-  font-size: 0.9rem;
+.attribution {
+  margin: 1.25rem 0 0;
+  font-size: 0.78rem;
   color: var(--muted);
 }
 
-.source a { color: var(--text); text-decoration-color: var(--accent); text-underline-offset: 3px; }
-.source a:hover { color: var(--accent); }
+.sep { margin: 0 0.5rem; }
+
+.lower-third {
+  margin-top: 2rem;
+  border-left: 3px solid var(--accent);
+  background: rgba(255, 255, 255, 0.045);
+  padding: 1.1rem 1.25rem 1.25rem;
+}
+
+.lower-third h2 {
+  display: inline-block;
+  margin: -1.55rem 0 0.85rem calc(-1.25rem - 3px);
+  padding: 0.3rem 0.8rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lower-third p { margin: 0; font-size: 0.9rem; }
+
+.source { margin-top: 0.9rem !important; font-size: 0.78rem !important; color: var(--muted); }
+.source a { color: var(--amber); text-underline-offset: 3px; }
+.source a:hover { color: #fff; }
+
+/* ---------- cabinet furniture ---------- */
+
+.cabinet {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 0.4rem 0.15rem;
+}
+
+.plate {
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #d8c5a6;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+.grille {
+  flex: 1;
+  height: 0.9rem;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.4) 0 2px,
+    rgba(255, 255, 255, 0.05) 2px 4px
+  );
+}
+
+.knobs { display: flex; gap: 0.6rem; flex: none; }
+
+.knobs i {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #6b563c, #241b12);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- liner notes ---------- */
 
 footer {
-  max-width: 44rem;
-  margin: 0 auto;
   width: 100%;
-  font-size: 0.85rem;
+  max-width: 48rem;
+  margin: 0 auto;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 
 summary {
   cursor: pointer;
   padding: 0.5rem 0;
-  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
 }
 
 summary:hover { color: var(--text); }
 
 #archive-list {
-  margin: 0.5rem 0 1.5rem;
-  padding-left: 1.25rem;
+  margin: 0.75rem 0 1.5rem;
+  padding-left: 1.5rem;
   display: grid;
   gap: 0.9rem;
 }
 
-#archive-list li { padding-left: 0.25rem; }
 #archive-list .a-claim { color: var(--text); }
-#archive-list a { color: var(--muted); text-decoration-color: var(--line); }
-#archive-list a:hover { color: var(--accent); }
+#archive-list a { color: var(--muted); }
+#archive-list a:hover { color: var(--amber); }
 
 .disclaimer {
   margin: 0;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--line);
-  line-height: 1.55;
+  padding-top: 1.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  line-height: 1.6;
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
-    --bg: #fbfbfa;
-    --surface: #ffffff;
-    --line: #e2e2df;
-    --text: #17181a;
-    --muted: #6b7280;
-    --accent: #c62b30;
-  }
+  footer { color: #4b453a; }
+  #archive-list .a-claim { color: #201c16; }
+  #archive-list a { color: #4b453a; }
+  .disclaimer { border-top-color: rgba(0, 0, 0, 0.18); }
 }
+
+/* ---------- motion ---------- */
 
 @media (prefers-reduced-motion: no-preference) {
-  .toon-body {
-    transform-box: fill-box;
-    transform-origin: 50% 90%;
-    animation: yell 0.5s ease-in-out infinite alternate;
-  }
-
-  .toon-shout {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: shout 0.5s ease-in-out infinite alternate;
-  }
+  .screen { animation: power-on 0.75s cubic-bezier(0.2, 0.9, 0.2, 1) both; }
+  .broadcast { animation: warm-up 0.9s ease-out 0.25s both; }
+  .rec { animation: blink 1.4s steps(1, end) infinite; }
+  .roll { display: block; animation: roll 7s linear infinite; }
 }
 
-@keyframes yell {
-  from { transform: rotate(-1.3deg) translateY(0.6px); }
-  to   { transform: rotate(1.3deg) translateY(-0.6px); }
+@keyframes power-on {
+  0%   { transform: scaleY(0.006) scaleX(0.7); filter: brightness(3); opacity: 0; }
+  45%  { transform: scaleY(0.006) scaleX(1); filter: brightness(3); opacity: 1; }
+  100% { transform: none; filter: none; opacity: 1; }
 }
 
-@keyframes shout {
-  from { opacity: 0.3; transform: scale(0.9); }
-  to   { opacity: 0.95; transform: scale(1.06); }
+@keyframes warm-up {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  main > * { animation: rise 0.45s ease both; }
+@keyframes blink {
+  0%, 60% { opacity: 1; }
+  61%, 100% { opacity: 0.15; }
 }
 
-@keyframes rise {
-  from { opacity: 0; transform: translateY(0.5rem); }
-  to { opacity: 1; transform: none; }
+@keyframes roll {
+  from { top: -25%; }
+  to   { top: 105%; }
 }
