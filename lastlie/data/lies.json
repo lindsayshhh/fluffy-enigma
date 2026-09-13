@@ -1,7 +1,7 @@
 {
   "subject": "Donald Trump",
   "updated": "2026-09-13",
-  "note": "Every entry is a claim a named news organization published a fact-check on, with a link to that fact-check. Claims are given as reported speech with the fact-checkers' verbatim quoted fragments preserved; nothing here is a reconstructed quote.",
+  "note": "Every entry links to a published fact-check by a named outlet, and only claims an outlet rated false are listed. Hand-written entries render the claim as reported speech with the fact-checkers' quoted fragments preserved; entries from the Fact Check API carry the claim text as the fact-checker recorded it. Nothing here is a reconstructed quote.",
   "entries": [
     {
       "id": "2026-09-10-empty-seats",

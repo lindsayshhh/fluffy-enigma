@@ -4,23 +4,71 @@ A single-purpose website: it shows the most recent claim by Donald Trump that a
 news organization has published a fact-check on, what's actually true, and a
 link to that fact-check.
 
+## Where the claims come from
+
+Two sources, merged newest-first:
+
+1. **Live** — Google's [Fact Check Tools API](https://developers.google.com/fact-check/tools/api),
+   which indexes the schema.org `ClaimReview` markup fact-checkers publish. Needs
+   an API key; without one the site quietly runs on the curated list alone.
+2. **Curated** — `data/lies.json`, written by hand.
+
+When the same fact-check appears in both, the curated copy wins: it carries a
+written correction and a venue that the API has no field for.
+
+The page always states which list you're looking at, so a stale hand-kept list
+is never presented as a live feed.
+
+### Turning the live feed on
+
+```bash
+export FACTCHECK_API_KEY=...   # https://console.cloud.google.com — enable "Fact Check Tools API"
+npm run start:lastlie
+```
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `FACTCHECK_API_KEY` | *(unset)* | Enables the live feed. Without it the site serves curated entries only. |
+| `FACTCHECK_QUERY` | `Donald Trump` | Full-text search sent to the API. |
+| `FACTCHECK_CLAIMANT` | `Trump` | Substring matched against each claim's `claimant`. The API has no claimant parameter, so this filter runs here. |
+| `FACTCHECK_TTL_MS` | `900000` | How long live results are cached. |
+
+`GET /api/debug` re-queries the API and reports what came back — claims
+received, entries kept, and the rating of every claim that was dropped. It's
+the quickest way to tell a bad key from an over-narrow rating allowlist.
+`GET /api/lies?live=0` serves the curated list alone.
+
 ## What this is and isn't
 
-Every entry in `data/lies.json` is tied to a published fact-check by a named
-outlet, and the site links out to it. Two rules keep the site honest:
+Every entry links to a published fact-check by a named outlet. Three rules keep
+the site honest:
 
-- **No invented quotes.** Claims are recorded as reported speech with the
-  fact-checkers' verbatim quoted fragments preserved (`Said prices on “almost
-  every item” are rapidly going down.`). Where a fact-check didn't publish the
-  full sentence, this site doesn't reconstruct one.
-- **Only claims rated false.** Statements that are merely unproven, disputed or
-  lacking evidence are left out rather than filed under "lie."
+- **No invented quotes.** Hand-written entries render the claim as reported
+  speech with the fact-checkers' verbatim quoted fragments preserved. Live
+  entries carry the claim text exactly as the fact-checker recorded it. Neither
+  reconstructs a sentence nobody published.
+- **Only claims rated false.** The rating allowlist in
+  `providers/factcheck.js` fails closed — "Misleading", "Unproven" and "No
+  evidence" are not falsehoods, and anything unrecognised is dropped rather
+  than published as a lie. `/api/debug` lists what got dropped so the allowlist
+  can be widened deliberately instead of silently swallowing claims.
+- **No unsourced accusations.** An entry without a named publisher and a URL is
+  a fatal error, not a blank field.
 
-The list is maintained by hand, so it lags the fact-checkers it cites. The page
-says so, and shows how old the top entry is. For live listings, see
-[PolitiFact](https://www.politifact.com/personalities/donald-trump/) and
-[FactCheck.org](https://www.factcheck.org/).
+`ClaimReview` carries a rating and a link but no correction prose, so live
+entries have no "what's actually true" text. The page leads with the
+publisher's own rating instead of inventing one.
 
+## Tests
+
+```bash
+npm test
+```
+
+Covers the rating allowlist, claim mapping, the newest-review pick, date
+fallback, merge and dedupe, and every failure mode of the API call (no key,
+HTTP error, network failure, unparseable body) against a fixture shaped like a
+real `claims:search` payload.
 
 ## The look
 

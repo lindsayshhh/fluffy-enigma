@@ -11,3 +11,7 @@ services:
     plan: free
     buildCommand: "true"
     startCommand: npm run start:lastlie
+    envVars:
+      # Set in the Render dashboard; without it the site serves the curated list.
+      - key: FACTCHECK_API_KEY
+        sync: false

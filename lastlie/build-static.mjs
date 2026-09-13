@@ -14,7 +14,9 @@ const OUT_DIR = path.join(__dirname, 'dist');
 
 const read = (f) => fs.readFileSync(path.join(PUBLIC_DIR, f), 'utf8');
 
-const data = loadDataset();
+// Bakes live claims in at build time when a key is set, so a published copy
+// is current as of its build rather than as of the last hand edit.
+const data = await loadDataset();
 const payload = { ...meta(data), entries: data.entries };
 
 // Escaping "<" keeps a "</script>" inside any string from closing the block early.

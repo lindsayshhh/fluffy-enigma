@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadDataset, meta } from './dataset.js';
+import { loadDataset, loadCurated, loadLive, meta } from './dataset.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -51,21 +51,60 @@ function serveStatic(req, res, pathname) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
-  if (url.pathname === '/api/latest') {
-    const data = loadDataset();
-    return sendJson(res, 200, { ...meta(data), latest: data.entries[0] || null });
-  }
-
-  if (url.pathname === '/api/lies') {
-    const data = loadDataset();
-    return sendJson(res, 200, { ...meta(data), entries: data.entries });
+  if (url.pathname.startsWith('/api/')) {
+    handleApi(url).then(
+      ({ status, body }) => sendJson(res, status, body),
+      (err) => sendJson(res, 500, { error: 'Unexpected server error.', detail: String(err) }),
+    );
+    return;
   }
 
   serveStatic(req, res, url.pathname);
 });
 
-// Fail loudly at boot on a malformed dataset rather than serving a broken page.
-loadDataset();
+async function handleApi(url) {
+  // Skipping the live lookup keeps the curated list servable when the API is
+  // slow, blocked, or unkeyed.
+  const live = url.searchParams.get('live') !== '0';
+
+  if (url.pathname === '/api/latest') {
+    const data = await loadDataset({ live });
+    return { status: 200, body: { ...meta(data), latest: data.entries[0] || null } };
+  }
+
+  if (url.pathname === '/api/lies') {
+    const data = await loadDataset({ live });
+    return { status: 200, body: { ...meta(data), entries: data.entries } };
+  }
+
+  // Reports what the upstream actually returned and why claims were dropped —
+  // the fastest way to tell a bad key from an over-narrow rating allowlist.
+  if (url.pathname === '/api/debug') {
+    const result = await loadLive({ force: true });
+    return {
+      status: 200,
+      body: {
+        keyPresent: Boolean(process.env.FACTCHECK_API_KEY),
+        query: process.env.FACTCHECK_QUERY || 'Donald Trump',
+        claimant: process.env.FACTCHECK_CLAIMANT || 'Trump',
+        ok: result.ok,
+        reason: result.reason,
+        claimsReceived: result.received ?? null,
+        entriesKept: (result.entries || []).length,
+        skipped: result.skipped,
+        sample: (result.entries || []).slice(0, 3),
+        curatedCount: loadCurated().entries.length,
+      },
+    };
+  }
+
+  return { status: 404, body: { error: 'Not found.' } };
+}
+
+// Fail loudly at boot on a malformed curated file rather than serving a broken
+// page. The live lookup is deliberately not awaited here: the site must start
+// even when the API is unreachable.
+loadCurated();
 
 server.listen(PORT, () => {
   console.log(`The Last Lie running at http://localhost:${PORT}`);

@@ -48,11 +48,21 @@ function renderLatest(entry, subject) {
   fill(node, 'eyebrow', `${subject}'s most recent fact-checked false claim`);
   fill(node, 'claim', entry.claim);
   fill(node, 'venue', entry.venue || 'Public remarks');
-  fill(node, 'reality', entry.reality);
   fill(node, 'clock', shortDate(entry.date));
 
   const time = fill(node, 'date', `${longDate(entry.date)} — ${relative(entry.date)}`);
   time.dateTime = entry.date;
+
+  // Live entries carry the publisher's own rating but no correction prose —
+  // ClaimReview has no field for one — so the panel leads with the rating and
+  // shows written detail only where a hand-checked entry supplies it.
+  fill(node, 'rating', entry.rating || 'False');
+  fill(node, 'verdict-by', `${entry.source.name}'s rating`);
+  fill(node, 'verdict-label', entry.reality ? "What's actually true" : 'The verdict');
+
+  const realityEl = node.querySelector('[data-slot="reality"]');
+  if (entry.reality) realityEl.textContent = entry.reality;
+  else realityEl.hidden = true;
 
   const source = fill(node, 'source', entry.source.name);
   source.href = entry.source.url;
@@ -84,6 +94,18 @@ function renderArchive(entries) {
     li.append(claim, link);
     return li;
   }));
+}
+
+// Says out loud which list the reader is looking at, so a stale hand-kept
+// list is never passed off as a live feed.
+function provenance(data) {
+  if (data.mode === 'live') {
+    return `${data.liveCount} pulled live from Google's Fact Check Tools API and ` +
+      `${data.curatedCount} written by hand; the live ones refresh on their own.`;
+  }
+  return `Maintained by hand${data.liveReason ? ` — the live feed is off (${data.liveReason})` : ''}, ` +
+    `so it lags the fact-checkers it cites. Last updated ${longDate(data.updated)}; ` +
+    `see PolitiFact or FactCheck.org for their live listings.`;
 }
 
 function renderError(message) {
@@ -123,9 +145,7 @@ async function load() {
   renderArchive(entries.slice(1));
 
   document.getElementById('disclaimer').textContent =
-    `${data.note} Records ${data.total} claim${data.total === 1 ? '' : 's'}; ` +
-    `list last updated ${longDate(data.updated)}. It is maintained by hand, so it lags ` +
-    `the fact-checkers it cites — see PolitiFact or FactCheck.org for their live listings.`;
+    `${data.note} ${provenance(data)} Records ${data.total} claim${data.total === 1 ? '' : 's'}.`;
 
   document.title = `The Last Lie — ${longDate(entries[0].date)}`;
 }

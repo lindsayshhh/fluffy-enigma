@@ -309,3 +309,25 @@ summary:hover { color: var(--note-strong); }
   from { top: -25%; }
   to   { top: 105%; }
 }
+
+[hidden] { display: none !important; }
+
+.verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0 0 0.85rem !important;
+  font-size: 0.78rem !important;
+  color: var(--muted);
+}
+
+.rating {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
