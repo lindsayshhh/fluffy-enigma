@@ -5,3 +5,15 @@ services:
     plan: free
     buildCommand: "true"
     startCommand: npm start
+  - type: web
+    name: etsy-trending
+    runtime: node
+    plan: free
+    rootDir: etsy-trending
+    buildCommand: "true"
+    startCommand: npm start
+    envVars:
+      - key: ETSY_API_KEY
+        sync: false
+      - key: ETSY_SHARED_SECRET
+        sync: false

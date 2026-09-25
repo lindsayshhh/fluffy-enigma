@@ -1,0 +1,14 @@
+{
+  "name": "etsy-trending",
+  "version": "1.0.0",
+  "description": "A website showing what is trending on Etsy right now",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
