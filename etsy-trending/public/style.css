@@ -1,0 +1,103 @@
+:root {
+  color-scheme: light dark;
+  --bg: #faf7f2;
+  --surface: #ffffff;
+  --line: #e8e1d6;
+  --text: #222020;
+  --text-dim: #6d655c;
+  --accent: #d5541c;
+  --accent-soft: #fbe6da;
+  --skeleton: #efe9df;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #181614;
+    --surface: #221f1c;
+    --line: #36312b;
+    --text: #f1ece5;
+    --text-dim: #a89f94;
+    --accent: #ff8a52;
+    --accent-soft: #3a2519;
+    --skeleton: #2b2723;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+
+.top { border-bottom: 1px solid var(--line); background: var(--surface); padding: 32px 0 20px; }
+h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); letter-spacing: -0.02em; }
+.lede { margin: 6px 0 20px; color: var(--text-dim); max-width: 60ch; }
+
+.search { display: flex; gap: 8px; max-width: 560px; }
+.search input {
+  flex: 1; min-width: 0; padding: 11px 16px; font: inherit; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 999px;
+}
+.search input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.search button, .sort button, .chip, .tag {
+  font: inherit; cursor: pointer; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--text);
+}
+.search button { padding: 0 20px; background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+.chips { display: flex; gap: 8px; margin-top: 16px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.chip { padding: 6px 14px; white-space: nowrap; font-size: 0.9rem; }
+.chip:hover, .tag:hover, .sort button:hover { border-color: var(--accent); }
+.chip.active, .sort button.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+.tags-section { margin-top: 24px; }
+.tags-section h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin: 0 0 8px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { padding: 4px 12px; font-size: 0.85rem; background: var(--accent-soft); border-color: transparent; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin: 24px 0 16px; }
+.summary { margin: 0; color: var(--text-dim); font-size: 0.9rem; }
+.sort { display: flex; gap: 4px; }
+.sort button { padding: 6px 12px; font-size: 0.85rem; }
+
+.notice { background: var(--accent-soft); border-radius: 12px; padding: 16px 20px; margin: 24px 0 20px; }
+.notice a { color: var(--accent); }
+.notice code { background: var(--surface); padding: 1px 6px; border-radius: 4px; }
+
+.grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+@media (max-width: 520px) { .grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
+
+.card a { display: block; color: inherit; text-decoration: none; }
+.media {
+  position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: var(--skeleton);
+}
+.media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s; }
+.card a:hover img { transform: scale(1.04); }
+.rank {
+  position: absolute; top: 8px; left: 8px; padding: 2px 8px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65); color: #fff; font-size: 0.8rem; font-weight: 600;
+}
+.body { padding: 8px 2px 0; }
+.body h3 {
+  margin: 0; font-size: 0.92rem; font-weight: 500;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.meta { margin: 4px 0 0; font-size: 0.9rem; font-weight: 600; }
+.stats { margin: 4px 0 0; font-size: 0.8rem; color: var(--text-dim); display: flex; flex-wrap: wrap; gap: 6px; }
+.heat { color: var(--accent); font-weight: 600; }
+
+.skeleton .media { animation: pulse 1.2s ease-in-out infinite; }
+.skeleton h3, .skeleton .meta { background: var(--skeleton); border-radius: 4px; color: transparent; }
+@keyframes pulse { 50% { opacity: 0.55; } }
+
+.foot { color: var(--text-dim); font-size: 0.8rem; padding-top: 40px; padding-bottom: 40px; }

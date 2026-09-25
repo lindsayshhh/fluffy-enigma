@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Etsy Trending</title>
+  <meta name="description" content="See which Etsy listings are gathering favorites fastest right now.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <h1>What's trending on Etsy</h1>
+      <p class="lede">Listings collecting favorites fastest right now, from the items Etsy ranks highest for each search.</p>
+      <form id="search" class="search" role="search">
+        <input id="q" type="search" placeholder="Search a niche, e.g. &ldquo;fall wreath&rdquo;" aria-label="Search Etsy trends" autocomplete="off">
+        <button type="submit">Search</button>
+      </form>
+      <nav id="chips" class="chips" aria-label="Categories"></nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="tags-section" class="tags-section" hidden>
+      <h2>Hot tags</h2>
+      <div id="tags" class="tags"></div>
+    </section>
+
+    <div id="toolbar" class="toolbar">
+      <p id="summary" class="summary" aria-live="polite"></p>
+      <div class="sort" role="group" aria-label="Sort">
+        <button type="button" data-sort="hot" class="active">Hottest</button>
+        <button type="button" data-sort="loved">Most favorited</button>
+        <button type="button" data-sort="new">Newest</button>
+      </div>
+    </div>
+
+    <div id="notice" class="notice" hidden></div>
+    <ol id="grid" class="grid"></ol>
+  </main>
+
+  <footer class="wrap foot">
+    <p>Data from the Etsy Open API. "Hottest" = favorites per day since the item was first listed. Not affiliated with Etsy.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
