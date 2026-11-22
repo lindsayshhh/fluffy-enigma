@@ -11,6 +11,8 @@ import { Player } from './player.js';
 import { Game, loadSave, clearSave, newState } from './game.js';
 import { smoothstep } from './noise.js';
 import { loadAssets } from './assets.js';
+import { loadHumans, makeHumanCast } from './humans.js';
+import { findShore } from './terrain.js';
 
 const canvas = document.getElementById('c');
 const startBtn = document.getElementById('start');
@@ -95,6 +97,17 @@ async function build() {
   status('Waking up the locals…');
   await step();
   const cast = makeCast();
+  let extras = [];
+  try {
+    status('Waking up the locals… 0%');
+    const humans = await loadHumans((f) => status(`Waking up the locals… ${Math.round(f * 100)}%`));
+    const made = makeHumanCast(humans);
+    Object.assign(cast, made.cast);
+    extras = made.extras;
+  } catch (e) {
+    console.warn('Realistic characters failed to load; using the simple ones.', e);
+  }
+  setupExtras(extras);
   const gull = makeSeagull();
   scene.add(gull);
   audio = new Audio();
@@ -257,6 +270,7 @@ function loop() {
   }
 
   world.update(t, dt, night, started && player.swimming ? player.camera.position : null);
+  updateExtras(dt, t, hour % 24);
 
   if (audio && started) {
     const p = player.pos;
@@ -282,3 +296,41 @@ build().catch((err) => {
   p.textContent = String(err && err.stack ? err.stack : err);
   document.querySelector('#title .inner').appendChild(p);
 });
+
+// Background beachgoers: they don't talk, they just vacation.
+let extraList = [];
+function setupExtras(extras) {
+  const spots = [
+    () => {
+      const l = L.loungers[1];
+      return { day: { x: l.x + 1.5, z: l.z + 4, face: 0 }, hours: [9, 18] };
+    },
+    () => {
+      const s = findShore(4, 0, 0, 1);
+      return { day: { x: s.x, z: s.z + 2.5, face: 0.2 }, hours: [9, 18.5] };
+    },
+    () => {
+      const l = L.loungers[6];
+      return { day: { x: l.x - 1.5, z: l.z + 3.5, face: -0.4 }, night: { x: L.bar.x - 8.5, z: L.bar.z + 6, face: 0.8 }, hours: [9, 24.5] };
+    },
+  ];
+  extraList = extras.map((h, i) => {
+    const cfg = spots[i % spots.length]();
+    scene.add(h.group);
+    return { h, cfg };
+  });
+}
+function updateExtras(dt, t, hour) {
+  for (const { h, cfg } of extraList) {
+    const on = hour >= cfg.hours[0] && hour < cfg.hours[1];
+    h.group.visible = on;
+    if (!on) continue;
+    const evening = cfg.night && hour >= 19;
+    const spot = evening ? cfg.night : cfg.day;
+    h.group.position.set(spot.x, world.groundAt(spot.x, spot.z), spot.z);
+    h.group.rotation.y = spot.face;
+    h.pose = evening && h.role.evening ? 'dance' : null;
+    const near = started && Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) < 6;
+    h.update(dt, t, { look: near ? player.pos : null });
+  }
+}

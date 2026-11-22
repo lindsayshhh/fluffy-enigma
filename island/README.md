@@ -2,7 +2,7 @@
 
 A first-person vacation game. You're a guest on a small tropical island for three days. Your goal is to have as much **fun** and be as **relaxed** as possible before the boat leaves, with help from the island's residents (and despite one seagull).
 
-It runs in the browser on [three.js](https://threejs.org/), with no build step. The island, palms, water, people and sound are generated in code; surfaces and a few props use photoscanned textures and models from [Poly Haven](https://polyhaven.com) (CC0, see [`assets/CREDITS.md`](assets/CREDITS.md)). If those files are missing, the game falls back to its procedural look.
+It runs in the browser on [three.js](https://threejs.org/), with no build step. The island, palms, water and sound are generated in code; surfaces and a few props use photoscanned textures and models from [Poly Haven](https://polyhaven.com) (CC0), and the characters are realistic, motion-captured avatars from the [Microsoft Rocketbox library](https://github.com/microsoft/Microsoft-Rocketbox) (MIT). See [`assets/CREDITS.md`](assets/CREDITS.md). If any of those files are missing, the game falls back to its procedural look.
 
 ## Run it
 
@@ -61,13 +61,15 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 | `src/sky.js` | Physical sky, sun/moon lighting through the day, stars, clouds, environment lighting |
 | `src/props.js` | Palms, grass, flowers, rocks, reef, fish, turtle and every building; collision and walkable surfaces |
 | `src/layout.js` | Where everything sits, derived from the real shoreline |
-| `src/people.js` | The characters and Kevin |
+| `src/humans.js` | Realistic Rocketbox characters: loading, animation blending, head tracking, props |
+| `src/people.js` | Fallback procedural characters, and Kevin |
+| `tools/` | Scripts that converted the Rocketbox textures and animations for the web |
 | `src/dialogue.js` | Every conversation, as data |
 | `src/game.js` | Meters, time, schedules, interactions, events, scoring |
 | `src/player.js` | First-person movement, swimming and diving |
 | `src/ui.js` | HUD, dialogue, narration, minigames, postcards |
 | `src/audio.js` | Synthesised surf, wind, birds, crickets and the steel-pan loop at the bar |
 
-`vendor/` holds an unmodified copy of three.js r170 and the addons it uses (MIT licence, see `vendor/LICENSE`). `assets/` holds the Poly Haven files (about 10 MB).
+`vendor/` holds an unmodified copy of three.js r170 and the addons it uses (MIT licence, see `vendor/LICENSE`). `assets/` holds the Poly Haven and Rocketbox files (about 26 MB in total).
 
 Add `?hour=17.5` to the URL to start at a particular time of day.
