@@ -1,0 +1,610 @@
+// Every conversation on Palmera Cay.
+//
+// A character is { name, title, color, start(s) -> node id, nodes }.
+// A node is { text, choices }. text may be a function of (state, game).
+// A choice is { text, if?, fx?, set?, act?, go?, end?, close? }:
+//   if(s)   only offered when true
+//   fx      meter changes: fun, relax, energy, sunburn, credits
+//   set     flags to set true (array) or assign (object)
+//   act(g)  run game logic; with close:true the dialogue closes first
+//   go      next node id; end: close the dialogue
+
+const pick = (g, key, lines) => lines[g.counter(key) % lines.length];
+
+const DRINKS = {
+  lobster: ['The Lobster Thermidor', 'Aloe-infused, served in the shade. Which, please, you should also be served in.', { relax: 8, sunburn: -10, fun: 4 }],
+  mild: ['The Mild Disappointment', "Tastes like a Tuesday. Kidding. It tastes like a Saturday that finally got its act together.", { fun: 13, relax: 4 }],
+  unread: ['The Unread Notification', "Chamomile, coconut rum, and a tiny umbrella that means 'not now.'", { relax: 13, fun: 4 }],
+  second: ['The Second Wind', "Cold brew, coconut water, and a dash of 'you can nap later.'", { energy: 22, fun: 5 }],
+  last: ['The Last Sunset', "It's sweeter because it ends. Like a vacation. Like everything. Enjoy it.", { fun: 9, relax: 9 }],
+  random: [
+    ['The Hammock Theory', 'Passion fruit, lime, and the radical idea that you are allowed to lie down.', { fun: 8, relax: 9 }],
+    ['Low Tide Feelings', 'Gentle. Salty. A little exposed. You know what you did.', { fun: 9, relax: 8 }],
+    ['The Unbothered', "Pineapple, rum, and the confidence of a man who has never once replied-all.", { fun: 8, relax: 10 }],
+    ['Sand in Unexpected Places', "It's a lot. It's gritty. You'll be finding it for weeks. You'll love it.", { fun: 11, relax: 6 }],
+  ],
+};
+
+function diagnose(s, g) {
+  let d;
+  if (s.sunburn > 55) d = DRINKS.lobster;
+  else if (s.energy < 28) d = DRINKS.second;
+  else if (s.fun < 38) d = DRINKS.mild;
+  else if (s.relax < 38) d = DRINKS.unread;
+  else if (s.day === 3 && s.hour > 17) d = DRINKS.last;
+  else d = DRINKS.random[g.counter('drinkPick') % DRINKS.random.length];
+  return d;
+}
+
+export const CHARACTERS = {
+  // ----------------------------------------------------------------- DEZ
+  dez: {
+    name: 'Dez',
+    title: 'Bartender, The Salty Coconut',
+    color: '#0d7377',
+    start: (s) => (s.flags.metDez ? 'hub' : 'intro'),
+    nodes: {
+      intro: {
+        text: "Welcome to The Salty Coconut. I'm Dez. I don't make drinks. I make diagnoses. Then I make drinks.",
+        choices: [
+          { text: 'Diagnose me, doctor.', go: 'diag' },
+          { text: 'Just a water, please.', fx: { energy: 6 }, set: ['metDez'], go: 'water' },
+        ],
+      },
+      diag: {
+        text: (s) =>
+          s.items.phone
+            ? "Mm. Shoulders up by your ears. Thumb twitching like it's looking for a phone. You checked your email at the departure gate, didn't you?"
+            : "Mm. You've already lost the phone. Good. But your jaw's still clenched like it's in a quarterly review.",
+        choices: [
+          { text: '...Twice.', go: 'rx' },
+          { text: 'I would never.', fx: { fun: 3 }, go: 'lie' },
+        ],
+      },
+      rx: {
+        text: "Twice. Okay. I'm prescribing The Out-of-Office: rum, lime, and the sound of you not replying. First one's on the house.",
+        choices: [{ text: 'Cheers, Dez.', fx: { fun: 5, relax: 8 }, set: ['metDez'], go: 'hub' }],
+      },
+      lie: {
+        text: "Your pocket just buzzed, friend. I could hear it over the ocean. Here. The Out-of-Office. On the house.",
+        choices: [{ text: 'Thank you.', fx: { fun: 5, relax: 7 }, set: ['metDez'], go: 'hub' }],
+      },
+      water: {
+        text: "Water. Bold. Very 'I read a wellness blog on the plane.' On the house. Come back when you're ready to feel something.",
+        choices: [{ text: 'Will do.', go: 'hub' }],
+      },
+      hub: {
+        text: (s, g) => {
+          if (s.sunburn > 60) return "Friend, you look like a medium-rare steak. I'm legally obligated to mention the shade.";
+          if (s.hour >= 21) return "Late shift. The ocean's doing its night voice. What can I get you?";
+          return pick(g, 'dezHub', [
+            "What'll it be?",
+            'The ocean called. Said you can stay as long as you want.',
+            'Back again. The coconut whispered you would come.',
+            "Dez polishes a glass that is already clean. It's a lifestyle.",
+          ]);
+        },
+        choices: [
+          { text: 'Diagnose me a drink. ($12)', if: (s) => s.credits >= 12 && s.today.drinks < 3, act: (g) => g.orderDrink(diagnose(g.s, g)), go: 'drink' },
+          { text: 'Diagnose me a drink.', if: (s) => s.today.drinks >= 3, go: 'cutoff' },
+          { text: 'Something to eat? ($8)', if: (s) => s.credits >= 8 && !s.items.snack, go: 'snack' },
+          { text: 'Got anything... special?', if: (s) => !s.flags.coconutQuest, set: ['coconutQuest'], go: 'coconut' },
+          { text: 'One Existential Coconut, please.', if: (s) => s.items.coconut && s.flags.coconutQuest && !s.flags.existential, go: 'existential' },
+          { text: 'Any gossip?', go: 'gossip' },
+          { text: "What's the deal with that seagull?", if: (s) => !s.flags.askedKevin, set: ['askedKevin'], go: 'kevin' },
+          { text: 'Could you hold my phone? Like... forever?', if: (s) => s.items.phone, go: 'phone' },
+          { text: 'See you later, Dez.', end: true },
+        ],
+      },
+      drink: {
+        text: (s, g) => `"${g.lastDrink[0]}." He slides it across the counter. "${g.lastDrink[1]}"`,
+        choices: [{ text: 'Cheers.', go: 'hub' }],
+      },
+      cutoff: {
+        text: "That's three feelings today, friend. Here's a water and an honest compliment: your eyebrows are noticeably more relaxed than when you arrived.",
+        choices: [{ text: 'Thanks, Dez.', fx: { energy: 4, relax: 2 }, go: 'hub' }],
+      },
+      snack: {
+        text: "Fish taco, plantain chips, or the churro. The churro's very popular. Mostly with Kevin.",
+        choices: [
+          { text: "Fish taco. I'll eat it right here.", fx: { credits: -8, fun: 4, relax: 4, energy: 16 }, go: 'here' },
+          { text: "Churro to go. I'm eating it on a lounger like royalty.", fx: { credits: -8 }, act: (g) => g.give('snack'), go: 'togo' },
+          { text: 'Never mind.', go: 'hub' },
+        ],
+      },
+      here: { text: 'Excellent choice. Under the roof is the one place Kevin respects. Mostly.', choices: [{ text: '(eat)', go: 'hub' }] },
+      togo: {
+        text: "To go. Brave. If a seagull makes eye contact with you, don't negotiate. Just walk faster. Loungers are down on the sand.",
+        choices: [{ text: 'Got it.', end: true }],
+      },
+      coconut: {
+        text: "There's one drink. The Existential Coconut. Can't make it with store coconuts. It needs a coconut with history. The old grove inland has palms short enough to shake. Bring me one and it's on the house.",
+        choices: [{ text: "I'll find you a coconut with history.", go: 'hub' }],
+      },
+      existential: {
+        text: 'Dez splits it with one chop, adds something from an unlabeled bottle, and a paper umbrella. You sip. For eleven seconds you understand everything: taxes, tides, why Kevin is the way he is. Then it passes. You feel incredible.',
+        choices: [
+          {
+            text: 'Whoa.',
+            act: (g) => {
+              g.take('coconut');
+              g.fx({ relax: 25, fun: 15 });
+              g.memory('existential', 'Drank The Existential Coconut and understood everything for eleven seconds.');
+            },
+            set: ['existential'],
+            go: 'hub',
+          },
+        ],
+      },
+      gossip: {
+        text: (s, g) => {
+          const lines = [
+            "Gary's been trying to send one email since Tuesday. Word is the only signal on the island is up on the hill by the lighthouse. Don't tell him I told you. Actually, do. He keeps holding his laptop over my blender.",
+            "Brenda has an itinerary for her itinerary. Laminated. I watched her schedule a nap and then power-walk to it.",
+            'The Captain says forty years at sea. Ask him what happened to The Unsinkable I. Watch his face.',
+            "Nana Pearl hustled me out of three piña coladas at volleyball last week. She's eighty-four. I don't want to talk about it.",
+            "Marisol does sunset yoga on the west deck, five-ish. I don't know about chakras, but I've never seen anyone leave it stressed.",
+            'Honestly? The best thing on this island is nothing. The hammock, inland from the beach. Twenty minutes. Life-changing.',
+          ];
+          const i = g.counter('dezGossip') % lines.length;
+          if (i === 0) g.setFlag('knowsWifi');
+          return lines[i];
+        },
+        choices: [{ text: 'Juicy.', fx: { fun: 2 }, go: 'hub' }],
+      },
+      kevin: {
+        text: "That's Kevin. Kevin has eaten more churros than you've had hot dinners. Kevin fears neither God nor man nor broom. If you buy food, eat it under the roof.",
+        choices: [{ text: 'Noted. Respect Kevin.', go: 'hub' }],
+      },
+      phone: {
+        text: "In the ice bin, with the limes? Sure. It'll be cool. Emotionally. You can have it back when you leave. ...Unless you don't want it back.",
+        choices: [
+          {
+            text: 'Take it. Please.',
+            act: (g) => {
+              g.take('phone');
+              g.fx({ relax: 18 });
+              g.memory('phone_dez', "Surrendered your phone to the bartender's ice bin. You haven't felt this free since you were nine.");
+            },
+            go: 'hub',
+          },
+          { text: "Actually... I'm not ready.", go: 'hub' },
+        ],
+      },
+    },
+  },
+
+  // -------------------------------------------------------------- BRENDA
+  brenda: {
+    name: 'Brenda Pike',
+    title: 'Itinerary enthusiast, Dayton, Ohio',
+    color: '#ff5d8f',
+    start: (s) => (s.flags.metBrenda ? 'hub' : 'intro'),
+    nodes: {
+      intro: {
+        text: "Oh! A new face! Brenda Pike, Dayton, Ohio. Are you on the 10:15 Kayak-and-Kale, or the 10:20 Kale-and-Kayak?",
+        choices: [
+          { text: "I don't really have a plan.", set: ['metBrenda'], go: 'noplan' },
+          { text: 'Kale-and-Kayak. Obviously.', set: ['metBrenda'], fx: { fun: 4 }, go: 'pen' },
+        ],
+      },
+      pen: { text: "A person of taste! I'll pencil you in. Pen, actually. This is happening.", choices: [{ text: 'Great...', go: 'hub' }] },
+      noplan: {
+        text: "No... plan? You're on an island with no plan? What if something fun happens and you're not READY?",
+        choices: [
+          { text: "Then I guess I'll... have fun?", fx: { relax: 2 }, go: 'notHow' },
+          { text: 'Could I see your itinerary?', go: 'itinerary' },
+        ],
+      },
+      notHow: { text: "That's not how fun works. Fun is scheduled. Fun is laminated.", choices: [{ text: 'Is it, though?', go: 'hub' }] },
+      itinerary: {
+        text: "She holds it up proudly. It's laminated. Twice.\n\n06:00  Sunrise (attend)\n06:15  Gratitude jog\n07:00  Breakfast, part one\n09:30  Competitive shell sorting\n11:47  Spontaneous fun (pre-approved)\n14:00  Relax (vigorously)\n22:25  Lie down (personal best attempt)",
+        choices: [{ text: "'Relax vigorously'?", fx: { fun: 6 }, go: 'vigor' }],
+      },
+      vigor: {
+        text: 'You relax harder when you focus! I did forty-five minutes of relaxing yesterday and my heart rate was a hundred and sixty.',
+        choices: [{ text: "That's... a lot.", go: 'hub' }],
+      },
+      hub: {
+        text: (s, g) => {
+          if (s.flags.brendaRelaxed) return pick(g, 'brendaChill', ["I have no idea what time it is and I LOVE it.", 'Did you know clouds just... go wherever? No schedule. Icons.', "I took off both watches. My wrists can breathe. I didn't know wrists breathed."]);
+          if (s.sunburn > 55 && !s.flags.brendaSunscreen) return 'Sweetie. SWEETIE. You are the color of a stop sign.';
+          return pick(g, 'brendaHub', ['Brenda checks her watch. Then her other watch.', "Can't stop long, I've got Mandatory Leisure in six minutes!", "Have you hydrated? I've hydrated four times. It's on the card."]);
+        },
+        choices: [
+          { text: 'Brenda, have you ever tried just... lying down?', if: (s) => !s.flags.brendaRelaxed && (s.flags.brendaStage || 0) === 0, go: 'stage0' },
+          { text: "About lying down for no reason...", if: (s) => !s.flags.brendaRelaxed && s.flags.brendaStage === 1, go: 'stage1' },
+          { text: "Ready for fifteen minutes of nothing?", if: (s) => !s.flags.brendaRelaxed && s.flags.brendaStage === 2, go: 'stage2' },
+          { text: "Got any spare sunscreen?", if: (s) => s.sunburn > 55 && !s.flags.brendaSunscreen && !s.flags.brendaRelaxed, go: 'spf' },
+          { text: "What's on the itinerary right now?", if: (s) => !s.flags.brendaRelaxed && s.today.brendaJoin < 1, go: 'join' },
+          { text: 'See you around, Brenda.', go: 'bye' },
+        ],
+      },
+      bye: { text: (s) => (s.flags.brendaRelaxed ? 'Around! Whenever! Who cares!' : "'Around' is not a time, but okay!"), choices: [{ text: '(leave)', end: true }] },
+      spf: {
+        text: 'Here. SPF 50. I have eleven. I have a bottle for my bottles. Reapply every two hours, I set an alarm.',
+        choices: [{ text: 'Thank you, Brenda.', set: ['brendaSunscreen'], act: (g) => g.applySunscreen(3), go: 'hub' }],
+      },
+      join: {
+        text: "Perfect timing! It's Competitive Shell Sorting o'clock! You can be on my team. Team Brenda. Usually it's just me.",
+        choices: [
+          {
+            text: "Let's sort some shells.",
+            close: true,
+            act: (g) => {
+              g.s.today.brendaJoin++;
+              g.narrate(
+                ['You sort shells by size, by color, by "vibe," and by "potential."', 'Brenda wins. You were on her team. She still wins. She gives you a gold star sticker that says "TEAM BRENDA (CO-CAPTAIN)."'],
+                () => g.fx({ fun: 12, energy: -12, relax: -4 }),
+                1
+              );
+            },
+          },
+          { text: 'Maybe later.', go: 'hub' },
+        ],
+      },
+      stage0: {
+        text: "Lying down is scheduled for 22:25! Last night I made it by 22:31. I'm getting faster.",
+        choices: [{ text: "That's not what I meant.", go: 'stage0b' }],
+      },
+      stage0b: {
+        text: "Brenda pauses. You get the sense she has never paused before. \"...What did you mean?\"",
+        choices: [{ text: 'Just lying down. For no reason at all.', set: { brendaStage: 1 }, fx: { fun: 3 }, go: 'stage0c' }],
+      },
+      stage0c: { text: "For NO reason? ...I'll have to think about that. I'll schedule some time to think about it.", choices: [{ text: 'You do that.', go: 'hub' }] },
+      stage1: {
+        text: "You keep saying 'lie down for no reason.' Have YOU done it? Personally? I need data.",
+        choices: [
+          { text: 'I spent an hour in the hammock. Nothing bad happened.', if: (s) => s.flags.usedHammock, go: 'stage1b' },
+          { text: 'Not yet.', go: 'stage1n' },
+        ],
+      },
+      stage1n: { text: "Hmph. Come back with data. Preferably in a chart.", choices: [{ text: '(The hammock is inland from the south beach.)', go: 'hub' }] },
+      stage1b: {
+        text: 'Nothing? No emails? No... consequences?',
+        choices: [{ text: 'Just a breeze and a gecko that sat on my knee.', set: { brendaStage: 2 }, fx: { relax: 4 }, go: 'stage1c' }],
+      },
+      stage1c: { text: 'A gecko. On your KNEE. ...Let me look at my week and get back to you.', choices: [{ text: 'Take your time. That is the point.', go: 'hub' }] },
+      stage2: {
+        text: "Fine. FINE. Fifteen minutes. Penciled. Not inked. Where is this famous hammock?",
+        choices: [
+          {
+            text: "Come on. I'll show you.",
+            close: true,
+            set: ['brendaRelaxed'],
+            act: (g) => {
+              g.narrate(
+                [
+                  'You walk Brenda to the hammock. She gets in like someone being lowered into a cold pool.',
+                  'Minute one: she checks her watch. Minute four: she checks her other watch. Minute nine: she takes both watches off.',
+                  'Minute fifteen comes and goes. Brenda is asleep. She snores. It is the most peaceful sound on the island.',
+                  'Later she finds you. Her itinerary has a big X across it, drawn in sunscreen. "I want you to have these," she says, and hands you her SPF 100 and a snorkel voucher. "I don\'t need to plan for them anymore."',
+                ],
+                () => {
+                  g.fx({ relax: 20, fun: 12 });
+                  g.give('spf100');
+                  g.give('voucher');
+                  g.applySunscreen(6);
+                  g.memory('brenda', 'Taught Brenda Pike to do absolutely nothing. She cried a little. Good tears.');
+                },
+                0.75
+              );
+            },
+          },
+          { text: 'Actually, not right now.', go: 'hub' },
+        ],
+      },
+    },
+  },
+
+  // ------------------------------------------------------------- CAPTAIN
+  captain: {
+    name: 'Captain Lorenzo Bellamy',
+    title: 'Snorkel tours · "40 years at sea"',
+    color: '#1f5fa8',
+    start: (s) => (s.flags.metCaptain ? 'hub' : 'intro'),
+    nodes: {
+      intro: {
+        text: 'Ahoy! Captain Lorenzo Bellamy. Forty years on the open water.',
+        choices: [
+          { text: 'Forty years! Where?', set: ['metCaptain'], go: 'where' },
+          { text: 'Ahoy, Captain!', set: ['metCaptain'], fx: { fun: 3 }, go: 'ahoy' },
+        ],
+      },
+      where: {
+        text: "Lake Michigan. Well. A pond. Near Lake Michigan. It had ducks, sailor. Aggressive ducks. You don't forget a duck like that.",
+        choices: [{ text: 'I imagine not.', fx: { fun: 5 }, go: 'hub' }],
+      },
+      ahoy: { text: "Now THAT is a greeting. Most people just say 'Is that boat safe?'", choices: [{ text: 'Is that boat safe?', fx: { fun: 3 }, go: 'safe' }] },
+      safe: { text: 'She is named The Unsinkable II. Read into that what you will.', choices: [{ text: '...', go: 'hub' }] },
+      hub: {
+        text: (s, g) => {
+          if (s.hour < 9 || s.hour >= 16) return "Tours run nine to four, sailor. The ocean needs her rest. Union rules.";
+          return pick(g, 'capHub', ['The Captain squints at the horizon like it owes him money.', "Fair winds today. Or at least winds. I'm not an expert on fairness.", "Reef's calling, sailor. Can you hear it? That's either the reef or my knee."]);
+        },
+        choices: [
+          { text: 'Book a snorkel tour. ($60)', if: (s) => s.hour >= 9 && s.hour < 16 && s.credits >= 60 && !s.items.voucher && s.today.tours < 1, go: 'book' },
+          { text: "Use Brenda's snorkel voucher.", if: (s) => s.hour >= 9 && s.hour < 16 && s.items.voucher && s.today.tours < 1, go: 'bookV' },
+          { text: 'What happened to The Unsinkable I?', if: (s) => !s.flags.askedU1, set: ['askedU1'], go: 'u1' },
+          { text: 'Any sailing wisdom?', go: 'wisdom' },
+          { text: 'Fair winds, Captain.', end: true },
+        ],
+      },
+      book: {
+        text: "Two hours, the reef, a sea turtle if she's in the mood, and my running commentary at no extra charge. Climb aboard!",
+        choices: [
+          { text: "Let's go!", close: true, act: (g) => g.tour(false) },
+          { text: 'Maybe later.', go: 'hub' },
+        ],
+      },
+      bookV: {
+        text: "A Brenda voucher! Laminated! I've never seen one actually redeemed. Climb aboard, sailor!",
+        choices: [{ text: "Let's go!", close: true, act: (g) => g.tour(true) }],
+      },
+      u1: { text: "We don't talk about The Unsinkable I.", choices: [{ text: '...It sank, didn\'t it?', go: 'u1b' }] },
+      u1b: { text: 'She was *reassigned to the seabed*. With full honors. The ducks attended.', choices: [{ text: 'My condolences.', fx: { fun: 6 }, go: 'hub' }] },
+      wisdom: {
+        text: (s, g) => {
+          const lines = [
+            "Red sky at night, sailor's delight. Red sky in the morning? That's your sunburn, son. Get some shade.",
+            'Never trust a fish that looks you in the eye. It is planning something.',
+            'A good captain always knows where the snacks are.',
+            'The sea gives, and the sea takes. Mostly it takes sunglasses.',
+            "If you see someone on the hill by the lighthouse at night waving a laptop, that's not a ghost. That's Gary. He thinks there's Wi-Fi up there. There is, actually.",
+          ];
+          const i = g.counter('capWisdom') % lines.length;
+          if (i === 4) g.setFlag('knowsWifi');
+          return lines[i];
+        },
+        choices: [{ text: 'Aye aye.', fx: { fun: 2 }, go: 'hub' }],
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------- GARY
+  gary: {
+    name: 'Gary Lindqvist',
+    title: 'Has been trying to send one email for four days',
+    color: '#5b8bd9',
+    start: (s, g) => {
+      if (!s.flags.metGary) return 'intro';
+      if (s.flags.garyDone) return 'free';
+      if (s.flags.garyToLighthouse && g.garyAtWifi()) return 'sent';
+      return 'hub';
+    },
+    nodes: {
+      intro: {
+        text: "Don't move. DON'T move. I had half a bar when you were standing there... Gone. Hi. Gary. I need to send one email. It's been four days. It has an attachment.",
+        choices: [
+          { text: "What's the email?", set: ['metGary'], go: 'email' },
+          { text: 'Have you tried turning the island off and on again?', set: ['metGary'], fx: { fun: 6 }, go: 'offon' },
+        ],
+      },
+      email: {
+        text: "It says 'Sounds good!' That's it. My boss wants to 'circle back after the holiday,' and if I don't say 'Sounds good!' before the holiday ends, I'll have to circle back to the circle back.",
+        choices: [{ text: 'Oof.', fx: { fun: 5 }, go: 'hub' }],
+      },
+      offon: { text: "...Is that possible? Don't joke. I'm in a fragile place.", choices: [{ text: 'Sorry, Gary.', go: 'hub' }] },
+      hub: {
+        text: (s, g) =>
+          s.flags.garyToLighthouse
+            ? "I'm heading for the lighthouse! Elevation, baby! ...Is it this way? It's uphill. Everything good is uphill."
+            : pick(g, 'garyHub', ['Gary rotates slowly, laptop raised like an offering to a very specific god.', 'Can you see bars? Do I have bars? I need ONE bar.', 'I tried the dock. I tried the bar. I tried standing in the sea. A fish judged me.']),
+        choices: [
+          { text: "I heard there's signal up on the hill by the lighthouse.", if: (s) => s.flags.knowsWifi && !s.flags.garyToLighthouse, set: ['garyToLighthouse'], go: 'lighthouse' },
+          { text: 'Gary... what if you just didn\'t send it?', if: (s) => !s.flags.garyToLighthouse && (s.relax >= 55 || !s.items.phone), go: 'nosend' },
+          { text: 'Any luck so far?', go: 'luck' },
+          { text: 'Good luck, Gary.', end: true },
+        ],
+      },
+      luck: {
+        text: 'Yesterday I got one bar standing on one leg in the surf at low tide. Then a wave hit me. The bar was gone. So was my sandal. The sandal had sentimental value.',
+        choices: [{ text: 'RIP sandal.', fx: { fun: 3 }, go: 'hub' }],
+      },
+      lighthouse: {
+        text: "The LIGHTHOUSE? Of course! Height! Elevation! Lighthouses are basically ancient routers! Meet me up there!",
+        choices: [{ text: 'Go get it, Gary.', end: true }],
+      },
+      nosend: {
+        text: "Not... send it? But then they'd circle back. They'd circle back, and then—",
+        choices: [
+          { text: 'Let them circle, Gary.', go: 'circle' },
+          { text: 'Never mind.', go: 'hub' },
+        ],
+      },
+      circle: {
+        text: 'He looks at the laptop. He looks at the ocean. He looks at the laptop. "Let them... circle." A long breath. "LET THEM CIRCLE!"',
+        choices: [
+          {
+            text: '(watch)',
+            close: true,
+            set: ['garyDone', 'garyBuried'],
+            act: (g) => {
+              g.narrate(
+                [
+                  'Gary digs a hole in the sand with the focus of a man who has finally found a deliverable he believes in.',
+                  'He lowers the laptop in. He says a few words. You think one of them is "synergy." He covers it with sand and puts a shell on top.',
+                  'Then he takes off his socks. Both of them. He walks into the sea up to his knees and laughs for the first time in four days.',
+                ],
+                () => {
+                  g.fx({ fun: 15, relax: 12 });
+                  g.memory('gary_bury', 'Talked Gary into burying his laptop in the sand like pirate treasure.');
+                },
+                0.25
+              );
+            },
+          },
+        ],
+      },
+      sent: {
+        text: "IT SENT. It actually sent. 'Sounds good!' Do you know what that feels like? It feels like... wait. Was the ocean always this color?",
+        choices: [
+          {
+            text: 'Welcome to vacation, Gary.',
+            set: ['garyDone'],
+            act: (g) => {
+              g.fx({ fun: 10, relax: 10 });
+              g.memory('gary_sent', "Helped Gary finally send the words 'Sounds good!' He wept at the view.");
+            },
+            go: 'closeLaptop',
+          },
+        ],
+      },
+      closeLaptop: { text: 'Gary closes the laptop. Gently. Like a book he has finished.', choices: [{ text: '(nod)', end: true }] },
+      free: {
+        text: (s, g) =>
+          pick(g, 'garyFree', [
+            "I went in the ocean today. On purpose! Did you know there are fish in there?",
+            'I had a churro. Kevin took half. I let him. We have an understanding now.',
+            "I haven't thought about a spreadsheet in hours. I can't remember what a pivot table is. It's beautiful.",
+          ]),
+        choices: [{ text: 'Proud of you, Gary.', fx: { relax: 2 }, end: true }],
+      },
+    },
+  },
+
+  // ------------------------------------------------------------- MARISOL
+  marisol: {
+    name: 'Marisol Vega-Sun',
+    title: 'Wellness guide · aura consultant',
+    color: '#8e5cc9',
+    start: (s) => (s.flags.metMarisol ? 'hub' : 'intro'),
+    nodes: {
+      intro: {
+        text: "Oh! Your aura is so... beige. No, no, it's okay! Beige is just a color waiting to become a sunset.",
+        choices: [
+          { text: 'My aura is what?', set: ['metMarisol'], go: 'beige' },
+          { text: 'Thank you?', set: ['metMarisol'], fx: { relax: 3 }, go: 'compliment' },
+        ],
+      },
+      beige: {
+        text: "Beige! Like an office carpet. Like a spreadsheet's dreams. We can fix it. Sunset yoga, on the west deck, around five.",
+        choices: [{ text: "I'll think about it.", fx: { fun: 4 }, go: 'hub' }],
+      },
+      compliment: { text: "You're welcome. That was a compliment in the language of chakras.", choices: [{ text: 'Neat.', go: 'hub' }] },
+      hub: {
+        text: (s, g) =>
+          s.hour >= 16.5 && s.hour < 19.75
+            ? "Marisol unrolls a mat facing the sun. 'The sun is about to do its best work. Join me?'"
+            : pick(g, 'marHub', ['Marisol balances on one foot, eyes closed, completely unbothered.', 'Breathe with me. In... and out. You just did yoga. Congratulations.', "Have you met the ocean? Properly? You should introduce yourself."]),
+        choices: [
+          { text: 'Join sunset yoga.', if: (s) => s.hour >= 16.5 && s.hour < 19.75 && s.today.yoga < 1, close: true, act: (g) => g.yoga() },
+          { text: 'Got any wellness tips?', go: 'tip' },
+          { text: 'Is any of this scientifically proven?', if: (s) => !s.flags.askedScience, set: ['askedScience'], go: 'science' },
+          { text: 'My phone keeps buzzing.', if: (s) => s.items.phone, set: ['hintBury'], go: 'phone' },
+          { text: 'Namaste.', go: 'namaste' },
+        ],
+      },
+      tip: {
+        text: (s, g) =>
+          pick(g, 'marTip', [
+            'Hydrate. The ocean is ninety-seven percent water, and look how relaxed it is.',
+            'Every time you check your phone, a sea turtle sighs.',
+            'Sand is just tiny rocks that have learned to let go.',
+            'Your inner child wants a nap and a snack. Listen to your inner child.',
+            'Float on your back in the sea. Let it hold you. It holds whales. It can handle you.',
+          ]),
+        choices: [{ text: 'Wise.', fx: { relax: 3 }, go: 'hub' }],
+      },
+      science: { text: 'Science is just vibes that wrote things down.', choices: [{ text: 'Fair.', fx: { fun: 5 }, go: 'hub' }] },
+      phone: {
+        text: "Mm. That's your aura trying to leave through your pocket. Have you considered... letting the sand hold it for you? Next time it buzzes. Just a thought. A beige thought, becoming a sunset.",
+        choices: [{ text: 'Bury it. Interesting.', go: 'hub' }],
+      },
+      namaste: { text: "Namaste. It means 'the beige in me honors the beige in you.'", choices: [{ text: '(bow)', end: true }] },
+    },
+  },
+
+  // --------------------------------------------------------------- PEARL
+  pearl: {
+    name: 'Nana Pearl',
+    title: 'Age 84 · undefeated since Tuesday',
+    color: '#b5179e',
+    start: (s) => (s.flags.metPearl ? 'hub' : 'intro'),
+    nodes: {
+      intro: {
+        text: 'Pull up, rookie. You play? Course you don\'t. Look at those knees. Pearl Abernathy. Eighty-four years young. Undefeated since Tuesday.',
+        choices: [
+          { text: 'Undefeated since Tuesday?', set: ['metPearl'], go: 'tuesday' },
+          { text: "I'll have you know I'm very good at volleyball.", set: ['metPearl'], go: 'good' },
+        ],
+      },
+      tuesday: { text: 'Lost to a lifeguard. He cheated. He was nineteen and had working joints.', choices: [{ text: 'Seems unfair.', fx: { fun: 5 }, go: 'hub' }] },
+      good: { text: 'Ha! That is what my third husband said. Lovely man. Terrible at volleyball.', choices: [{ text: 'Wow.', fx: { fun: 5 }, go: 'hub' }] },
+      hub: {
+        text: (s, g) =>
+          s.flags.beatPearl
+            ? "Pearl narrows her eyes at you. 'The wind was blowing that day and you know it.'"
+            : pick(g, 'pearlHub', ['Pearl stretches a hamstring with frightening flexibility.', "Pearl spins the ball on one finger. 'Scared, rookie?'", "Stretch your hamstrings. You walk like a folding chair."]),
+        choices: [
+          { text: "Let's play. First to three.", if: (s) => s.today.volley < 2 && s.energy >= 12, close: true, act: (g) => g.volleyball() },
+          { text: "I'm too tired to play right now.", if: (s) => s.energy < 12, go: 'tired' },
+          { text: 'Any life advice?', go: 'advice' },
+          { text: 'How did you get so good?', if: (s) => !s.flags.askedPearl, set: ['askedPearl'], go: 'origin' },
+          { text: 'Bye, Pearl.', end: true },
+        ],
+      },
+      tired: { text: "Tired? I'm eighty-four and I did a cartwheel this morning. Go have a nap, rookie. Then come back and lose.", choices: [{ text: 'Okay.', go: 'hub' }] },
+      advice: {
+        text: (s, g) =>
+          pick(g, 'pearlAdvice', [
+            'Marry someone who laughs at your jokes, outlive your enemies, and never trust a seagull named Kevin.',
+            'Nap like it is your job. I napped through two recessions and a moon landing.',
+            "Sunscreen, sweetheart. I look this good because I've been in the shade since 1971.",
+            'Life is short. Eat the churro. Eat it indoors, though. Kevin.',
+          ]),
+        choices: [{ text: 'Thanks, Pearl.', fx: { fun: 3, relax: 2 }, go: 'hub' }],
+      },
+      origin: {
+        text: '1962 Olympic trials. Didn\'t make the team. Got distracted by a lifeguard named Ricardo. Married him. Worth it. Then I had sixty years to practice out of spite.',
+        choices: [{ text: 'Respect.', fx: { fun: 6 }, go: 'hub' }],
+      },
+    },
+  },
+
+  // --------------------------------------------------------------- PHONE
+  phone: {
+    name: 'Your Phone',
+    title: 'bzzt bzzt',
+    color: '#555',
+    start: () => 'buzz',
+    nodes: {
+      buzz: {
+        text: (s, g) =>
+          pick(g, 'phoneMsg', [
+            "Your boss: 'Quick question!' (It is never a quick question.)",
+            "Your boss: 'No need to respond while you're out, but...'",
+            "Calendar: 'Q3 Synergy Alignment Sync' has moved to 'Q3 Synergy Alignment Sync (2).'",
+            "Work group chat (47 new): 'who took the stapler'",
+            "Your boss: 'Hope you're having a great time!! Also where is the file'",
+            "Networking app: 'Congratulate Derek on 6 years at Derek Consulting!'",
+            "Your boss: 'Just looping you in so you're in the loop of the loop.'",
+          ]),
+        choices: [
+          { text: 'Read it.', fx: { relax: -12, fun: -2 }, go: 'read' },
+          { text: 'Ignore it.', fx: { relax: -2 }, act: (g) => (g.s.phoneIgnores = (g.s.phoneIgnores || 0) + 1), go: 'ignore' },
+          { text: 'Bury it in the sand. Forever.', if: (s, g) => g.onSand() && (s.flags.hintBury || (s.phoneIgnores || 0) >= 2), go: 'bury' },
+        ],
+      },
+      read: {
+        text: 'You read it. Then the replies. Then the replies to the replies. A perfect wave breaks twenty feet away, unwitnessed.',
+        choices: [{ text: '(put it away)', end: true }],
+      },
+      ignore: { text: 'You put it face-down on your thigh. It vibrates like an angry hermit crab, then gives up. For now.', choices: [{ text: '(ahh)', end: true }] },
+      bury: {
+        text: 'You dig a hole. You lower the phone in like a tiny Viking funeral. You mark the spot with a shell. Then you move the shell. You will never find it again. You feel like a new person.',
+        choices: [
+          {
+            text: 'Goodbye, little rectangle.',
+            act: (g) => {
+              g.take('phone');
+              g.fx({ relax: 22, fun: 6 });
+              g.memory('buried', 'Buried your phone in the sand and lost the spot on purpose.');
+            },
+            end: true,
+          },
+        ],
+      },
+    },
+  },
+};

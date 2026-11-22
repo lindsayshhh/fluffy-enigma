@@ -1,5 +1,7 @@
 # Overhead
 
+> This repo also contains **Palmera Cay**, a 3D tropical-island vacation game, in [`island/`](island/README.md). Run it with `npm run island`.
+
 A tiny widget that tells you what airplane is flying above your current location, using live ADS-B data from [adsb.fi](https://adsb.fi/) (falling back to [adsb.lol](https://adsb.lol/) if that's unreachable).
 
 ## How it works

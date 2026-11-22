@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Palmera Cay</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">
+      { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+    </script>
+  </head>
+  <body class="ui-free">
+    <canvas id="c"></canvas>
+    <div id="tint"></div>
+    <div id="crosshair"></div>
+
+    <div id="hud">
+      <div class="when"><span id="clock">8:30 AM</span><span id="day">Day 1 of 3</span></div>
+      <div class="meter" data-k="fun"><label>Fun</label><span><i></i></span><b>0</b></div>
+      <div class="meter" data-k="relax"><label>Relaxation</label><span><i></i></span><b>0</b></div>
+      <div class="meter" data-k="energy"><label>Energy</label><span><i></i></span><b>0</b></div>
+      <div class="meter" data-k="sunburn"><label>Sunburn</label><span><i></i></span><b>0</b></div>
+      <div class="row"><span>Vacation bliss <b id="bliss">0</b></span><span id="credits">$200</span></div>
+      <div id="status"></div>
+    </div>
+    <div id="keys"><kbd>J</kbd> journal <kbd>Esc</kbd> pause</div>
+
+    <div id="prompt"></div>
+    <div id="toasts"></div>
+    <div id="memory"></div>
+
+    <div id="dialogue">
+      <div class="head"><span class="who"></span><span class="title"></span></div>
+      <p class="text"></p>
+      <div class="choices"></div>
+    </div>
+
+    <div id="narration">
+      <div class="inner">
+        <div class="time">Time passes…</div>
+        <p class="card"></p>
+        <button class="next">Continue</button>
+      </div>
+    </div>
+
+    <div id="minigame"></div>
+
+    <div id="journal" class="panel">
+      <div class="sheet">
+        <h2>Vacation Journal</h2>
+        <div class="body"></div>
+        <button data-close>Close <kbd>J</kbd></button>
+      </div>
+    </div>
+
+    <div id="pause" class="panel">
+      <div class="sheet">
+        <h2>Paused</h2>
+        <div class="body">
+          <p class="controls">
+            <kbd>W A S D</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump / climb out of the water ·
+            <kbd>C</kbd> dive while swimming · <kbd>E</kbd> interact · <kbd>1–4</kbd> choose · <kbd>J</kbd> journal
+          </p>
+          <label class="opt">Graphics <select id="quality"><option value="high">High</option><option value="low">Low (faster)</option></select></label>
+          <label class="opt">Volume <input id="volume" type="range" min="0" max="1" step="0.05" value="0.8" /></label>
+        </div>
+        <button id="resume">Back to the beach</button>
+      </div>
+    </div>
+
+    <div id="postcard" class="panel">
+      <div class="sheet wide">
+        <div class="body"></div>
+        <button class="go">Next</button>
+      </div>
+    </div>
+
+    <div id="finale" class="panel">
+      <div class="sheet wide">
+        <div class="body"></div>
+        <button class="again">Book another vacation</button>
+      </div>
+    </div>
+
+    <div id="title" class="show">
+      <div class="inner">
+        <p class="kicker">Three days. No agenda. (Brenda disagrees.)</p>
+        <h1>Palmera Cay</h1>
+        <p class="pitch">
+          You've finally taken a vacation. Your job is simple: have as much fun, and be as relaxed, as humanly possible
+          before the boat leaves. The island's residents will help. Mostly.
+        </p>
+        <div class="buttons">
+          <button id="start" disabled>Building the island…</button>
+          <button id="continue" hidden>Continue vacation</button>
+        </div>
+        <p class="controls">
+          <kbd>W A S D</kbd> walk · <kbd>Mouse</kbd> look · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump ·
+          <kbd>C</kbd> dive · <kbd>E</kbd> interact · <kbd>J</kbd> journal · Best with sound on, on a computer.
+        </p>
+      </div>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
