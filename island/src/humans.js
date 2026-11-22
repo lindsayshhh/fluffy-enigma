@@ -191,6 +191,16 @@ export class Human {
     this.headYaw = 0;
     this.phase = Math.random() * 10;
 
+    // Face rig: animations don't touch these bones, so we drive them here,
+    // relative to the rest pose.
+    const face = ['Bip01_MJaw', 'Bip01_MUpperLip', 'Bip01_LMouthCorner', 'Bip01_RMouthCorner', 'Bip01_LEyeBlinkTop', 'Bip01_REyeBlinkTop', 'Bip01_LEyeBlinkBottom', 'Bip01_REyeBlinkBottom', 'Bip01_LInnerEyebrow', 'Bip01_RInnerEyebrow', 'Bip01_MMiddleEyebrow'];
+    this.rest = {};
+    for (const n of face) if (this.bones[n]) this.rest[n] = { p: this.bones[n].position.clone(), q: this.bones[n].quaternion.clone() };
+    this.mouth = 0;
+    this.blink = 0;
+    this.nextBlink = 1 + Math.random() * 3;
+    this.brow = 0;
+
     if (role.hat) {
       this.hat = makeHat();
       this.group.add(this.hat);
@@ -210,7 +220,46 @@ export class Human {
     this.state = state;
   }
 
-  update(dt, t, { moving = false, speed = 1, talking = false, look = null } = {}) {
+  // Lip movement from a syllable-like rhythm, plus natural blinking.
+  updateFace(dt, t, speaking) {
+    const B = this.bones;
+    for (const [n, r] of Object.entries(this.rest)) {
+      B[n].position.copy(r.p);
+      B[n].quaternion.copy(r.q);
+    }
+    let target = 0;
+    if (speaking) {
+      const syl = Math.max(0, Math.sin(t * 13.0 + this.phase)) * (0.55 + 0.45 * Math.sin(t * 4.3 + this.phase * 2));
+      const pause = Math.sin(t * 1.7 + this.phase) > -0.75 ? 1 : 0.15;
+      target = syl * pause;
+    }
+    this.mouth = THREE.MathUtils.damp(this.mouth, target, 22, dt);
+    if (B.Bip01_MJaw) B.Bip01_MJaw.rotateZ(this.mouth * 0.14);
+    if (B.Bip01_MUpperLip) B.Bip01_MUpperLip.position.x += this.mouth * 0.12;
+    for (const n of ['Bip01_LMouthCorner', 'Bip01_RMouthCorner']) if (B[n]) B[n].position.x += this.mouth * -0.1 + 0.06;
+
+    this.nextBlink -= dt;
+    if (this.nextBlink <= 0) {
+      this.blinkT = 0;
+      this.nextBlink = 2 + Math.random() * 4 + (Math.random() < 0.2 ? -1.8 : 0);
+    }
+    if (this.blinkT !== undefined) {
+      this.blinkT += dt;
+      this.blink = Math.max(0, 1 - Math.abs(this.blinkT - 0.07) / 0.07);
+      if (this.blinkT > 0.16) this.blinkT = undefined;
+    } else this.blink = 0;
+    for (const side of ['L', 'R']) {
+      const top = B[`Bip01_${side}EyeBlinkTop`];
+      const bot = B[`Bip01_${side}EyeBlinkBottom`];
+      if (top) top.position.x -= this.blink * 1.15;
+      if (bot) bot.position.x += this.blink * 0.2;
+    }
+    // Eyebrows lift now and then while talking.
+    this.brow = THREE.MathUtils.damp(this.brow, speaking && Math.sin(t * 0.9 + this.phase) > 0.6 ? 1 : 0, 6, dt);
+    for (const n of ['Bip01_LInnerEyebrow', 'Bip01_RInnerEyebrow', 'Bip01_MMiddleEyebrow']) if (B[n]) B[n].position.x += this.brow * 0.25;
+  }
+
+  update(dt, t, { moving = false, speed = 1, talking = false, speaking = false, look = null } = {}) {
     let state = 'idle';
     if (moving) state = 'walk';
     else if (talking) state = 'talk';
@@ -234,6 +283,7 @@ export class Human {
     addWorldYaw(this.bones.Bip01_Spine2, this.headYaw * 0.25);
     addWorldYaw(this.bones.Bip01_Neck, this.headYaw * 0.35);
     addWorldYaw(this.bones.Bip01_Head, this.headYaw * 0.4);
+    this.updateFace(dt, t, speaking);
     this.model.updateMatrixWorld(true);
 
     const head = this.bones.Bip01_Head;

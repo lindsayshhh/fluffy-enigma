@@ -12,6 +12,7 @@ import { Game, loadSave, clearSave, newState } from './game.js';
 import { smoothstep } from './noise.js';
 import { loadAssets } from './assets.js';
 import { loadHumans, makeHumanCast } from './humans.js';
+import { Post } from './post.js';
 import { findShore } from './terrain.js';
 
 const canvas = document.getElementById('c');
@@ -53,10 +54,15 @@ let world;
 let L;
 let started = false;
 let water;
+let post;
 
 function applyQuality(q) {
   quality = q;
-  renderer.setPixelRatio(Math.min(devicePixelRatio, q === 'high' ? 1.75 : 1));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, q === 'high' ? 1.5 : 1));
+  if (post) {
+    post.setQuality(q);
+    post.setSize(innerWidth, innerHeight);
+  }
   if (sky) {
     const size = q === 'high' ? 2048 : 1024;
     sky.sun.shadow.mapSize.set(size, size);
@@ -157,7 +163,15 @@ async function build() {
     begin(true);
   };
 
-  window.__palmera = { game, player, world, L, sky };
+  try {
+    post = new Post(renderer, scene, camera, { skipAO: [water, sky.sky, sky.clouds, sky.stars, sky.moonMesh] });
+    applyQuality(quality);
+  } catch (e) {
+    console.warn('Post-processing unavailable; rendering directly.', e);
+    post = null;
+  }
+
+  window.__palmera = { game, player, world, L, sky, post };
   requestAnimationFrame(loop);
 }
 
@@ -214,6 +228,7 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  if (post) post.setSize(innerWidth, innerHeight);
 });
 
 const clock = new THREE.Clock();
@@ -285,8 +300,15 @@ function loop() {
     });
   }
 
-  renderer.render(scene, camera);
+  let dof = null;
+  if (started && game.talking && game.npcs[game.talking]) {
+    const n = game.npcs[game.talking].pos;
+    dof = camera.position.distanceTo(_head.set(n.x, n.y + 1.6, n.z));
+  }
+  if (post) post.render(dt, t, { focus: dof, underwater: under });
+  else renderer.render(scene, camera);
 }
+const _head = new THREE.Vector3();
 
 build().catch((err) => {
   console.error(err);

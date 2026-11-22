@@ -61,7 +61,8 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 | `src/sky.js` | Physical sky, sun/moon lighting through the day, stars, clouds, environment lighting |
 | `src/props.js` | Palms, grass, flowers, rocks, reef, fish, turtle and every building; collision and walkable surfaces |
 | `src/layout.js` | Where everything sits, derived from the real shoreline |
-| `src/humans.js` | Realistic Rocketbox characters: loading, animation blending, head tracking, props |
+| `src/humans.js` | Realistic Rocketbox characters: loading, animation blending, head tracking, lip movement and blinking, props |
+| `src/post.js` | Post-processing: ambient occlusion, bloom, depth of field in conversations, colour grade, vignette, film grain |
 | `src/people.js` | Fallback procedural characters, and Kevin |
 | `tools/` | Scripts that converted the Rocketbox textures and animations for the web |
 | `src/dialogue.js` | Every conversation, as data |
@@ -71,5 +72,7 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 | `src/audio.js` | Synthesised surf, wind, birds, crickets and the steel-pan loop at the bar |
 
 `vendor/` holds an unmodified copy of three.js r170 and the addons it uses (MIT licence, see `vendor/LICENSE`). `assets/` holds the Poly Haven and Rocketbox files (about 26 MB in total).
+
+The Graphics setting in the pause menu switches between **High** (ambient occlusion, depth of field, sharper resolution) and **Low** (faster, for older laptops).
 
 Add `?hour=17.5` to the URL to start at a particular time of day.

@@ -30,6 +30,10 @@ export class UI {
     });
   }
 
+  get typing() {
+    return performance.now() < (this.speakUntil || 0);
+  }
+
   get keyHandler() {
     return this._handler;
   }
@@ -109,6 +113,8 @@ export class UI {
     const full = text;
     clearInterval(this.typer);
     body.textContent = '';
+    // Lips move for roughly as long as the line would take to say aloud.
+    this.speakUntil = performance.now() + Math.min(9000, full.length * 55);
     const finish = () => {
       clearInterval(this.typer);
       body.textContent = full;
@@ -150,6 +156,7 @@ export class UI {
   }
 
   closeDialogue() {
+    this.speakUntil = 0;
     clearInterval(this.typer);
     this.dlg.classList.remove('show');
     this.keyHandler = null;

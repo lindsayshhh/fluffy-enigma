@@ -262,7 +262,7 @@ export class Game {
       P.group.rotation.y += dy * Math.min(1, dt * (talking ? 5 : 3));
       n.pos.y = THREE.MathUtils.damp(n.pos.y, this.world.groundAt(n.pos.x, n.pos.z, n.pos.y), 12, dt);
       if (n.key !== 'gary') P.pose = !n.moving && target.pose ? target.pose : null;
-      P.update(dt, t, { moving: n.moving, speed: n.def.speed / 1.2, talking, look: distP < 7 ? pp : null });
+      P.update(dt, t, { moving: n.moving, speed: n.def.speed / 1.2, talking, speaking: talking && this.ui.typing, look: distP < 7 ? pp : null });
     }
   }
 
