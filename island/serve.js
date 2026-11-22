@@ -12,6 +12,9 @@ const TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.gltf': 'model/gltf+json',
+  '.bin': 'application/octet-stream',
   '.svg': 'image/svg+xml',
 };
 

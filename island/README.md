@@ -2,7 +2,7 @@
 
 A first-person vacation game. You're a guest on a small tropical island for three days. Your goal is to have as much **fun** and be as **relaxed** as possible before the boat leaves, with help from the island's residents (and despite one seagull).
 
-It runs in the browser on [three.js](https://threejs.org/), with no build step and no assets to download: the island, the palms, the water, the people and the sound are all generated in code.
+It runs in the browser on [three.js](https://threejs.org/), with no build step. The island, palms, water, people and sound are generated in code; surfaces and a few props use photoscanned textures and models from [Poly Haven](https://polyhaven.com) (CC0, see [`assets/CREDITS.md`](assets/CREDITS.md)). If those files are missing, the game falls back to its procedural look.
 
 ## Run it
 
@@ -55,7 +55,8 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 
 | File | What it does |
 | --- | --- |
-| `src/terrain.js` | Island height field, vertex-coloured terrain, sand grain and underwater caustics |
+| `src/assets.js` | Loads the Poly Haven textures and models |
+| `src/terrain.js` | Island height field, terrain texture blending (sand, wet sand, grass, rock), underwater caustics |
 | `src/water.js` | Wave shader (depth-tinted shallows, Fresnel reflections, sun glitter, shoreline foam) and the matching wave height in JS |
 | `src/sky.js` | Physical sky, sun/moon lighting through the day, stars, clouds, environment lighting |
 | `src/props.js` | Palms, grass, flowers, rocks, reef, fish, turtle and every building; collision and walkable surfaces |
@@ -67,6 +68,6 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 | `src/ui.js` | HUD, dialogue, narration, minigames, postcards |
 | `src/audio.js` | Synthesised surf, wind, birds, crickets and the steel-pan loop at the bar |
 
-`vendor/` holds an unmodified copy of three.js r170 (MIT licence, see `vendor/LICENSE`).
+`vendor/` holds an unmodified copy of three.js r170 and the addons it uses (MIT licence, see `vendor/LICENSE`). `assets/` holds the Poly Haven files (about 10 MB).
 
 Add `?hour=17.5` to the URL to start at a particular time of day.

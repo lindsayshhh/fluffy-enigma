@@ -94,13 +94,16 @@ const PAL = {
   rockDark: C('#5a544c'),
 };
 
-export function buildTerrain(paths) {
+// layers: optional { sand, wet, grass, rock } -> { map, normal } photo textures.
+export function buildTerrain(paths, layers = null) {
   const seg = 340;
   const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, seg, seg);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
   const colors = new Float32Array(pos.count * 3);
+  const splat = new Float32Array(pos.count * 4);
   const col = new THREE.Color();
+  const ref = new THREE.Color();
   const tmp = new THREE.Color();
 
   for (let i = 0; i < pos.count; i++) {
@@ -113,6 +116,9 @@ export function buildTerrain(paths) {
     const n = fbm(x * 0.05, z * 0.05, 3);
     const n2 = valueNoise(x * 0.4, z * 0.4);
 
+    let wW = 1 - smoothstep(0.25, 0.95, h);
+    let wG = 0;
+    let wR = 0;
     if (h < -4) {
       col.copy(PAL.underwater).lerp(PAL.deep, smoothstep(-4, -14, h));
     } else if (h < 0.35) {
@@ -128,35 +134,76 @@ export function buildTerrain(paths) {
       const rock = smoothstep(0.55, 0.9, sl) + smoothstep(15, 22, h) * 0.6;
       tmp.copy(PAL.rock).lerp(PAL.rockDark, n2);
       col.lerp(tmp, Math.min(1, rock));
+      wR = Math.min(1, rock);
+      wG = g * (1 - wR);
     }
     if (h > 0.9) {
       const pd = pathDistance(x, z, paths);
       if (pd < 2.2) {
         tmp.copy(h < 2.6 ? PAL.sandWarm : PAL.dirt);
-        col.lerp(tmp, smoothstep(2.2, 0.9, pd) * 0.85);
+        const pw = smoothstep(2.2, 0.9, pd) * 0.85;
+        col.lerp(tmp, pw);
+        if (h < 2.6) wR *= 1 - pw;
+        else wR += wG * pw;
+        wG *= 1 - pw;
       }
     }
     // Micro variation so the vertex colours don't look airbrushed.
     col.multiplyScalar(0.94 + n2 * 0.1);
+    const wS = Math.max(0, 1 - wW - wG - wR);
+    splat.set([wS, wW, wG, wR], i * 4);
+    if (layers) {
+      // With photo textures the palette becomes a gentle tint relative to each layer.
+      ref.setRGB(
+        PAL.sand.r * wS + PAL.wet.r * wW + PAL.grass.r * wG + PAL.rock.r * wR,
+        PAL.sand.g * wS + PAL.wet.g * wW + PAL.grass.g * wG + PAL.rock.g * wR,
+        PAL.sand.b * wS + PAL.wet.b * wW + PAL.grass.b * wG + PAL.rock.b * wR
+      );
+      col.setRGB(
+        THREE.MathUtils.clamp(col.r / ref.r, 0.55, 1.5),
+        THREE.MathUtils.clamp(col.g / ref.g, 0.55, 1.5),
+        THREE.MathUtils.clamp(col.b / ref.b, 0.55, 1.5)
+      );
+    }
     colors[i * 3] = col.r;
     colors[i * 3 + 1] = col.g;
     colors[i * 3 + 2] = col.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('aSplat', new THREE.BufferAttribute(splat, 4));
   geo.computeVertexNormals();
 
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+  if (layers) mat.defines = { TEXTURED: '' };
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = shared.uTime;
     shader.uniforms.uSun = shared.uSun;
+    if (layers) {
+      ['sand', 'wet', 'grass', 'rock'].forEach((k, i) => {
+        shader.uniforms[`tD${i}`] = { value: layers[k].map };
+        shader.uniforms[`tN${i}`] = { value: layers[k].normal || layers[k].map };
+      });
+    }
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
-      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNormal;\nattribute vec4 aSplat;\nvarying vec4 vSplat;')
+      .replace(
+        '#include <worldpos_vertex>',
+        '#include <worldpos_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWNormal = normalize(mat3(modelMatrix) * objectNormal);\nvSplat = aSplat;'
+      );
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
 varying vec3 vWPos;
+varying vec3 vWNormal;
+varying vec4 vSplat;
+#ifdef TEXTURED
+uniform sampler2D tD0, tD1, tD2, tD3, tN0, tN1, tN2, tN3;
+// Two scales blended so the tiling doesn't show from a distance.
+vec4 layer(sampler2D t, vec2 uv) { return mix(texture2D(t, uv), texture2D(t, uv * 0.21 + 0.37), 0.35); }
+// Metres per texture tile for sand, wet sand, grass, rock.
+const vec4 TILE = vec4(2.6, 3.0, 2.2, 3.5);
+#endif
 uniform float uTime;
 uniform float uSun;
 float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
@@ -175,10 +222,47 @@ float caustic(vec2 uv, float t){
 }`
       )
       .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+#ifdef TEXTURED
+vec4 w = vSplat / max(0.001, dot(vSplat, vec4(1.0)));
+vec2 p = vWPos.xz;
+vec3 alb = vec3(0.0);
+// Per-layer grading: bleach the sand toward tropical cream, green up the grass.
+if (w.x > 0.01) { vec3 c = layer(tD0, p / TILE.x).rgb; float l = dot(c, vec3(0.3, 0.59, 0.11)); alb += mix(vec3(l), c, 0.6) * vec3(1.75, 1.62, 1.4) * w.x; }
+if (w.y > 0.01) alb += layer(tD1, p / TILE.y).rgb * vec3(1.45, 1.38, 1.28) * w.y;
+if (w.z > 0.01) alb += layer(tD2, p / TILE.z).rgb * vec3(0.95, 1.42, 0.68) * w.z;
+if (w.w > 0.01) alb += layer(tD3, p / TILE.w).rgb * 1.25 * w.w;
+diffuseColor.rgb *= alb;
+#endif`
+      )
+      .replace(
+        '#include <normal_fragment_maps>',
+        `#include <normal_fragment_maps>
+#ifdef TEXTURED
+vec3 nt = vec3(0.0);
+if (w.x > 0.01) nt += (layer(tN0, p / TILE.x).xyz * 2.0 - 1.0) * w.x;
+if (w.y > 0.01) nt += (layer(tN1, p / TILE.y).xyz * 2.0 - 1.0) * w.y;
+if (w.z > 0.01) nt += (layer(tN2, p / TILE.z).xyz * 2.0 - 1.0) * w.z;
+if (w.w > 0.01) nt += (layer(tN3, p / TILE.w).xyz * 2.0 - 1.0) * w.w;
+vec3 wn = normalize(normalize(vWNormal) + vec3(nt.x, 0.0, nt.y) * 1.1);
+normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
+#endif`
+      )
+      .replace(
+        '#include <roughnessmap_fragment>',
+        `#include <roughnessmap_fragment>
+#ifdef TEXTURED
+roughnessFactor = dot(w, vec4(0.95, 0.5, 0.95, 0.9));
+#endif`
+      )
+      .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
+#ifndef TEXTURED
 float grain = vn(vWPos.xz*3.1)*0.5 + vn(vWPos.xz*11.0)*0.35 + h21(floor(vWPos.xz*40.0))*0.15;
 diffuseColor.rgb *= 0.9 + grain*0.18;
+#endif
 float sub = smoothstep(0.05, -0.6, vWPos.y);
 if (sub > 0.0) {
   float c = caustic(vWPos.xz*0.055, uTime*0.55) + caustic(vWPos.xz*0.09 + 3.1, uTime*0.4)*0.6;

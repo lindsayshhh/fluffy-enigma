@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Sky } from 'three/addons/Sky.js';
+import { Sky } from 'three/addons/objects/Sky.js';
 import { smoothstep, lerp, rng } from './noise.js';
 
 // Colour keys by solar elevation (degrees).

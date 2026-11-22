@@ -10,6 +10,7 @@ import { UI } from './ui.js';
 import { Player } from './player.js';
 import { Game, loadSave, clearSave, newState } from './game.js';
 import { smoothstep } from './noise.js';
+import { loadAssets } from './assets.js';
 
 const canvas = document.getElementById('c');
 const startBtn = document.getElementById('start');
@@ -70,10 +71,14 @@ function applyQuality(q) {
 }
 
 async function build() {
+  status('Unpacking textures…');
+  const assets = await loadAssets(renderer, (f) => status(`Unpacking textures… ${Math.round(f * 100)}%`));
   status('Raising the island…');
   await step();
   L = computeLayout();
-  const terrain = buildTerrain(L.paths);
+  const T = assets.tex;
+  const layers = T.sand_01 && T.damp_beach_sand && T.sparse_grass && T.rock_ground ? { sand: T.sand_01, wet: T.damp_beach_sand, grass: T.sparse_grass, rock: T.rock_ground } : null;
+  const terrain = buildTerrain(L.paths, layers);
   scene.add(terrain.mesh);
   water = buildWater(terrain.heightTex);
   scene.add(water);

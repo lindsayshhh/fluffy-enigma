@@ -1,8 +1,43 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/BufferGeometryUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { height, slope, shared, findShore, pathDistance } from './terrain.js';
 import { fbm, rng, smoothstep, valueNoise } from './noise.js';
 import * as T from './textures.js';
+import { assets, texMaterial } from './assets.js';
+
+const TILE = 1.6; // metres per texture tile on boxes and cylinders
+
+// Give box/cylinder UVs in metres so photo textures keep a constant scale.
+function metreUVsBox(geo, w, h, d) {
+  const uv = geo.attributes.uv;
+  const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  const per = uv.count / 6;
+  for (let f = 0; f < 6; f++) {
+    for (let k = 0; k < per; k++) {
+      const i = f * per + k;
+      uv.setXY(i, (uv.getX(i) * dims[f][0]) / TILE, (uv.getY(i) * dims[f][1]) / TILE);
+    }
+  }
+}
+// A Poly Haven model recentred on its base and scaled to `size` metres across.
+function unitModel(name, size = 2, sink = 0.15) {
+  const m = assets.models[name];
+  if (!m) return null;
+  const g = m.geometry.clone();
+  g.computeBoundingBox();
+  const b = g.boundingBox;
+  const dim = b.getSize(new THREE.Vector3());
+  g.translate(-(b.min.x + b.max.x) / 2, -b.min.y - dim.y * sink, -(b.min.z + b.max.z) / 2);
+  const k = size / Math.max(dim.x, dim.z);
+  g.scale(k, k, k);
+  return { geometry: g, material: m.material };
+}
+
+function metreUVsCyl(geo, r, h) {
+  const uv = geo.attributes.uv;
+  const c = Math.max(0.3, 2 * Math.PI * r);
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) * c) / TILE, (uv.getY(i) * h) / TILE);
+}
 
 // ---------------------------------------------------------------------------
 // Materials
@@ -55,6 +90,13 @@ function initMaterials() {
   MAT.fish = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.2 });
   MAT.flame = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
   MAT.glass = new THREE.MeshStandardMaterial({ color: 0xffe7a0, emissive: 0xffd27a, emissiveIntensity: 0, roughness: 0.1, transparent: true, opacity: 0.6 });
+  // Photoscanned replacements where available (Poly Haven, CC0).
+  MAT.wood = texMaterial('weathered_planks', { color: 0xd9c4a8, fallback: MAT.wood });
+  MAT.woodDark = texMaterial('weathered_planks', { color: 0x9a8270, fallback: MAT.woodDark });
+  MAT.deck = texMaterial('wooden_planks', { color: new THREE.Color(1.25, 1.2, 1.12), fallback: MAT.deck });
+  MAT.thatch = texMaterial('thatch_roof_angled', { repeat: [14, 3], color: new THREE.Color(1.5, 1.22, 0.82), side: THREE.DoubleSide, fallback: MAT.thatch });
+  MAT.trunk = texMaterial('palm_tree_bark', { color: 0xd6c7b0, normalScale: 1.5, fallback: MAT.trunk });
+  MAT.rock = texMaterial('seaside_rock', { repeat: [1.5, 1.5], color: new THREE.Color(2.1, 1.95, 1.75), fallback: MAT.rock });
   MAT.bottle = ['#2f7d43', '#8a4a1c', '#c9d6dd', '#a82a33', '#d9a21e'].map(
     (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.15, transparent: true, opacity: 0.85 })
   );
@@ -312,7 +354,9 @@ export class World {
   }
 
   box(w, h, d, mat, x, y, z, parent, ry = 0) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const geo = new THREE.BoxGeometry(w, h, d);
+    metreUVsBox(geo, w, h, d);
+    const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
     m.rotation.y = ry;
     m.castShadow = true;
@@ -322,7 +366,9 @@ export class World {
   }
 
   cyl(rt, rb, h, mat, x, y, z, parent, seg = 10) {
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat);
+    const geo = new THREE.CylinderGeometry(rt, rb, h, seg);
+    metreUVsCyl(geo, Math.max(rt, rb), h);
+    const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
     m.castShadow = true;
     m.receiveShadow = true;
@@ -505,7 +551,13 @@ export class World {
 
   buildRocks() {
     const r = rng(555);
-    const geos = [rockGeometry(1), rockGeometry(2), rockGeometry(3)];
+    const scan07 = unitModel('rock_07');
+    const scan09 = unitModel('rock_09');
+    const geos = [scan07 ? scan07.geometry : rockGeometry(1), scan09 ? scan09.geometry : rockGeometry(2), rockGeometry(3)];
+    const mats = [scan07 ? scan07.material : MAT.rock, scan09 ? scan09.material : MAT.rock, MAT.rock];
+    const scanned = [!!scan07, !!scan09, false];
+    // The scans are lit for a studio; lift them to sit in tropical daylight.
+    for (const sc of [scan07, scan09]) if (sc) sc.material.color.setRGB(1.9, 1.8, 1.65);
     const lists = [[], [], []];
     for (let i = 0; i < 4000; i++) {
       const x = (r() - 0.5) * 360;
@@ -524,12 +576,13 @@ export class World {
     const q = new THREE.Quaternion();
     const c = new THREE.Color();
     lists.forEach((list, k) => {
-      const im = new THREE.InstancedMesh(geos[k], MAT.rock, list.length);
+      const im = new THREE.InstancedMesh(geos[k], mats[k], list.length);
       list.forEach((p, i) => {
-        q.setFromEuler(new THREE.Euler(p.t * 0.4, p.a, 0));
+        q.setFromEuler(new THREE.Euler(scanned[k] ? 0 : p.t * 0.4, p.a, 0));
         m4.compose(new THREE.Vector3(p.x, p.y, p.z), q, new THREE.Vector3(p.s, p.s, p.s));
         im.setMatrixAt(i, m4);
-        c.setHSL(0.08, 0.06 + p.t * 0.05, 0.3 + p.t * 0.15);
+        if (scanned[k]) c.setHSL(0.08, 0.06, 0.85 + p.t * 0.15);
+        else c.setHSL(0.08, 0.06 + p.t * 0.05, (MAT.rock.map ? 0.55 : 0.3) + p.t * 0.15);
         im.setColorAt(i, c);
         if (p.s > 0.7) this.colliders.push({ x: p.x, z: p.z, r: p.s * 0.85 });
       });
@@ -742,8 +795,17 @@ export class World {
       // stools
       const sx = Math.cos(a) * 4.5;
       const sz = Math.sin(a) * 4.5;
-      this.cyl(0.25, 0.25, 0.08, MAT.woodDark, sx, top + 0.78, sz, grp, 12);
-      this.cyl(0.05, 0.08, 0.76, MAT.metal, sx, top + 0.38, sz, grp, 6);
+      const stool = unitModel('bar_chair_round_01', 0.5, 0);
+      if (stool) {
+        const sm = new THREE.Mesh(stool.geometry, stool.material);
+        sm.position.set(sx, top, sz);
+        sm.rotation.y = -a - Math.PI / 2;
+        sm.castShadow = sm.receiveShadow = true;
+        grp.add(sm);
+      } else {
+        this.cyl(0.25, 0.25, 0.08, MAT.woodDark, sx, top + 0.78, sz, grp, 12);
+        this.cyl(0.05, 0.08, 0.76, MAT.metal, sx, top + 0.38, sz, grp, 6);
+      }
       void b;
       void slab;
     }
@@ -1223,8 +1285,9 @@ export class World {
       const h = height(x, z);
       if (h < 0.15 || h > 2) continue;
       if (this.excluded(x, z)) continue;
-      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: colors[this.shells.length % 5], roughness: 0.4 }));
-      m.position.set(x, h + 0.04, z);
+      const conch = unitModel('lambis_shell', 0.2, 0);
+      const m = conch ? new THREE.Mesh(conch.geometry, conch.material) : new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: colors[this.shells.length % 5], roughness: 0.4 }));
+      m.position.set(x, h + (conch ? -0.01 : 0.04), z);
       m.rotation.y = r() * 6;
       m.castShadow = true;
       this.scene.add(m);
