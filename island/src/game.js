@@ -232,10 +232,18 @@ export class Game {
         continue;
       }
       if (!P.group.visible) {
-        // Reappear quietly, away from the player's eyes.
-        if (n.pos.distanceTo(pp) > 20 || Math.hypot(target.x - pp.x, target.z - pp.z) > 20) {
+        // Come back on duty out of the player's sight if possible, but never
+        // keep someone away for long just because the player is standing there.
+        const cam = this.player.camera;
+        const fwd = cam.getWorldDirection(new THREE.Vector3());
+        const to = new THREE.Vector3(target.x - cam.position.x, 0, target.z - cam.position.z);
+        const dist = to.length();
+        const inView = dist < 60 && fwd.x * to.x + fwd.z * to.z > 0.35 * dist * Math.hypot(fwd.x, fwd.z);
+        n.hiddenFor = (n.hiddenFor || 0) + dt;
+        if (!inView || dist > 40 || n.hiddenFor > 10) {
           n.pos.set(target.x, this.world.groundAt(target.x, target.z), target.z);
           P.group.visible = true;
+          n.hiddenFor = 0;
         }
         continue;
       }

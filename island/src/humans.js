@@ -9,12 +9,12 @@ const BASE = 'assets/people/';
 
 // Which avatar plays whom, and how they move.
 export const CASTING = {
-  dez: { avatar: 'Male_Adult_12', sex: 'm', idle: 'm_idle' },
-  brenda: { avatar: 'Female_Adult_01', sex: 'f', idle: 'f_nervous', walk: 'f_walkfast' },
-  captain: { avatar: 'Male_Adult_14', sex: 'm', idle: 'm_look', hat: true },
+  dez: { avatar: 'Male_Adult_12', sex: 'm', idle: 'm_idle', beachwear: true },
+  brenda: { avatar: 'Female_Adult_01', sex: 'f', idle: 'f_nervous', walk: 'f_walkfast', beachwear: true },
+  captain: { avatar: 'Male_Adult_14', sex: 'm', idle: 'm_look', hat: true, beachwear: true },
   gary: { avatar: 'Male_Adult_08', sex: 'm', idle: 'm_breathe', laptop: true },
   marisol: { avatar: 'Female_Adult_03', sex: 'f', idle: 'f_calm' },
-  pearl: { avatar: 'Female_Adult_14', sex: 'f', idle: 'f_stretch', scale: 0.95 },
+  pearl: { avatar: 'Female_Adult_14', sex: 'f', idle: 'f_stretch', scale: 0.95, beachwear: true },
 };
 export const EXTRAS = [
   { avatar: 'Sports_Female_01', sex: 'f', idle: 'f_idle' },
@@ -48,7 +48,8 @@ async function loadClips() {
   return clips;
 }
 
-async function loadAvatar(name, texLoader, fbxLoader) {
+// beachwear: use the recoloured holiday outfit (tools/beachwear.py) when there is one.
+async function loadAvatar(name, texLoader, fbxLoader, beachwear = false) {
   const dir = `${BASE}${name}/`;
   const tex = (file, srgb) =>
     texLoader.loadAsync(dir + file).then(
@@ -66,7 +67,7 @@ async function loadAvatar(name, texLoader, fbxLoader) {
     if (o.isMesh) for (const m of [].concat(o.material)) if ((m.name || '').toLowerCase().includes('opacity')) hasOpacity = true;
   });
   const [bodyC, bodyN, headC, headN, opacity] = await Promise.all([
-    tex('body_color.jpg', true),
+    (beachwear ? tex('body_beach.jpg', true) : Promise.resolve(null)).then((t) => t || tex('body_color.jpg', true)),
     tex('body_normal.jpg'),
     tex('head_color.jpg', true),
     tex('head_normal.jpg'),
@@ -101,13 +102,14 @@ export async function loadHumans(onProgress) {
   manager.addHandler(/\.(tga|png|jpg)$/i, { setPath() { return this; }, load: () => new THREE.Texture() });
   const fbxLoader = new FBXLoader(manager);
   const texLoader = new THREE.TextureLoader();
-  const names = [...Object.values(CASTING), ...EXTRAS].map((c) => c.avatar);
+  const roles = [...Object.values(CASTING), ...EXTRAS];
+  const names = roles.map((c) => c.avatar);
   let done = 0;
   const clips = await loadClips();
   const models = {};
   await Promise.all(
     names.map((n) =>
-      loadAvatar(n, texLoader, fbxLoader).then((m) => {
+      loadAvatar(n, texLoader, fbxLoader, !!roles.find((r) => r.avatar === n).beachwear).then((m) => {
         models[n] = m;
         if (onProgress) onProgress(++done / names.length);
       })
