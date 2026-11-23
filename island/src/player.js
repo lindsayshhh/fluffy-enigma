@@ -159,15 +159,20 @@ export class Player {
       if (this.onBounds) this.onBounds();
     }
 
-    // Camera
+    this.bob += dt * Math.hypot(this.vel.x, this.vel.z) * (this.swimming ? 1.2 : 2.3);
+    this.syncCamera(t);
+    this.groundHeight = height(this.pos.x, this.pos.z);
+  }
+
+  // Place the camera at the player's eyes (called again after anything
+  // nudges the player, so the view never lags a frame behind).
+  syncCamera(t) {
     const moving = Math.hypot(this.vel.x, this.vel.z);
-    this.bob += dt * moving * (this.swimming ? 1.2 : 2.3);
     const bobY = this.swimming ? Math.sin(t * 1.3) * 0.03 : Math.sin(this.bob * 2) * 0.035 * Math.min(1, moving / 3);
     this.camera.position.set(this.pos.x, this.pos.y + EYE + bobY, this.pos.z);
     const roll = this.swimming ? Math.sin(t * 0.9) * 0.02 : 0;
     this.camera.rotation.set(this.pitch, this.yaw, roll, 'YXZ');
 
     this.underwater = this.camera.position.y < waveHeight(this.camera.position.x, this.camera.position.z, t) - 0.05;
-    this.groundHeight = height(this.pos.x, this.pos.z);
   }
 }

@@ -245,6 +245,8 @@ function loop() {
   if (started) {
     player.update(dt, t);
     game.update(dt, t);
+    game.keepPlayerOut(extraList.map((e) => e.h.group));
+    player.syncCamera(t);
     const f = game.focus();
     if (f && player.enabled) ui.prompt(f.label);
     else if (player.enabled && !game.busy && player.swimming && world.platformNear(player.pos.x, player.pos.z, 0.9)) ui.prompt('Climb out', 'Space');

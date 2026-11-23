@@ -266,6 +266,25 @@ export class Game {
     }
   }
 
+  // Characters are solid: keep the player (and the camera) from walking
+  // into them, which would put the camera inside their head.
+  keepPlayerOut(extraPeople = []) {
+    const pp = this.player.pos;
+    const bodies = Object.values(this.npcs).map((n) => n.person.group).concat(extraPeople);
+    for (const g of bodies) {
+      if (!g.visible) continue;
+      const dx = pp.x - g.position.x;
+      const dz = pp.z - g.position.z;
+      const d = Math.hypot(dx, dz);
+      const min = 0.75;
+      if (d < min && Math.abs(pp.y - g.position.y) < 1.5) {
+        const k = d > 1e-4 ? min / d : 0;
+        pp.x = g.position.x + (k ? dx * k : min);
+        pp.z = g.position.z + (k ? dz * k : 0);
+      }
+    }
+  }
+
   // ------------------------------------------------------------ Kevin
   updateKevin(dt, t) {
     const K = this.kevin;
