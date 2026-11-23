@@ -6,7 +6,18 @@ import { smoothstep } from './noise.js';
 export const HOUR_SECONDS = 45; // real seconds per in-game hour
 export const VACATION_DAYS = 3;
 
-const freshToday = () => ({ drinks: 0, tours: 0, yoga: 0, volley: 0, brendaJoin: 0, naps: 0, uses: {}, bliss: 0, memories: 0 });
+const freshToday = () => ({ drinks: 0, tours: 0, yoga: 0, volley: 0, brendaJoin: 0, naps: 0, fishing: 0, uses: {}, bliss: 0, memories: 0 });
+
+// What can come up on the end of a fishing line. weight: relative chance.
+const CATCHES = [
+  { id: 'snapper', weight: 5, text: 'A red snapper! It looks as surprised as you are. You let it go.', fx: { fun: 6 } },
+  { id: 'parrotfish', weight: 4, text: 'A parrotfish, bright as a box of crayons. It crunches at you indignantly. Back it goes.', fx: { fun: 7 } },
+  { id: 'flipflop', weight: 3, text: 'One flip-flop, size 11. The search for its partner begins and ends here.', fx: { fun: 4 } },
+  { id: 'seaweed', weight: 3, text: "Seaweed. Nature's participation trophy.", fx: { fun: 1, relax: 2 } },
+  { id: 'octopus', weight: 2, text: 'A small octopus. It steals your bait, high-fives you with three arms, and leaves.', fx: { fun: 9 } },
+  { id: 'bottle', weight: 1, text: "A message in a bottle. It reads: 'If found, please reply-all.' You throw it back. Some messages deserve the sea.", fx: { fun: 8 } },
+  { id: 'sandal', weight: 2, once: true, text: "A single leather sandal with 'GARY' written inside in marker. It has clearly been through something.", fx: { fun: 5 }, item: 'sandal' },
+];
 
 export function newState() {
   return {
@@ -219,10 +230,23 @@ export class Game {
     }
   }
 
+  // The last evening: everyone gathers round a bonfire on the beach.
+  bonfireActive() {
+    const s = this.s;
+    return s.day >= VACATION_DAYS && s.hour >= 19.5 && s.hour < 25;
+  }
+
+  bonfireSeat(key) {
+    const seats = this.world.bonfireSeats;
+    const order = ['dez', 'brenda', 'captain', 'gary', 'marisol', 'pearl'];
+    const seat = seats[(order.indexOf(key) * 1 + 1) % seats.length];
+    return { x: seat.x, z: seat.z, face: seat.face };
+  }
+
   updateNPCs(dt, t) {
     const pp = this.player.pos;
     for (const n of Object.values(this.npcs)) {
-      const target = n.def.target(this.s);
+      const target = this.bonfireActive() ? this.bonfireSeat(n.key) : n.def.target(this.s);
       const P = n.person;
       if (n.key === 'gary') P.pose = this.s.flags.garyDone ? null : 'laptop';
       if (n.key === 'gary' && P.laptop) P.laptop.visible = !this.s.flags.garyBuried && (!this.s.flags.garyDone || this.s.flags.garyToLighthouse);
@@ -479,6 +503,72 @@ export class Game {
         this.ui.toast('BWONNNG. Somewhere, Marisol nods approvingly.', 'neutral');
       },
     });
+    // ---- Kayaks
+    const P = this.player;
+    I.push({
+      pos: L.kayak, r: 3,
+      label: () => (P.kayak ? null : 'Take a kayak'),
+      act: () => {
+        const mesh = W.kayaks[0];
+        P.startKayak(mesh, L.kayak);
+        this.ui.toast('Paddle with W/S, steer with A/D. Press E near any beach to climb out.', 'item');
+        if (!s.flags.kayaked) {
+          this.setFlag('kayaked');
+          this.memory('kayak', 'Paddled a kayak out past the swimmers, where the water turns from green to impossible blue.');
+        }
+      },
+    });
+    I.push({
+      get pos() { return P.pos; }, r: 1,
+      visible: () => !!P.kayak && P.nearShore(),
+      label: () => 'Climb out of the kayak',
+      act: () => {
+        const mesh = P.stopKayak();
+        if (!mesh) return;
+        // Someone (probably Brenda) returns it to the rack.
+        const g = this.world.groundAt(L.kayak.x, L.kayak.z);
+        mesh.position.set(L.kayak.x - 0.7, g + 0.12, L.kayak.z);
+        mesh.rotation.set(0, 0.15, 0);
+      },
+    });
+
+    // ---- Fishing off the end of the dock
+    I.push({
+      pos: L.fishing, y: 1.35, r: 3,
+      label: () => (s.hour < 6 || s.hour >= 20 ? null : s.today.fishing < 2 ? 'Go fishing' : null),
+      act: () => this.fishing(),
+    });
+
+    // ---- The hidden cove
+    I.push({
+      pos: W.lair, r: 2.6,
+      label: () => (s.flags.foundLair ? null : 'Search the strange nest'),
+      act: () => {
+        this.setFlag('foundLair');
+        W.lairRing.visible = false;
+        this.narrate(
+          [
+            "Tucked behind the rocks is a nest the size of a bathtub. It's made of driftwood, beach towel and what looks like a resort lanyard.",
+            "Inside: forty-one churros in various stages of decay, six pairs of sunglasses, two phones, a TV remote, and Brenda's spare visor.",
+            "On top of it all, polished and placed with care: a gold wedding ring. Above you, a seagull lands on a rock and stares. It's Kevin. He knows that you know.",
+          ],
+          () => {
+            this.give('ring');
+            this.fx({ fun: 14, relax: 4 });
+            this.memory('lair', "Found Kevin's secret lair in the hidden cove: forty-one churros, six pairs of sunglasses and one gold ring.");
+          },
+          0.25
+        );
+      },
+    });
+
+    // ---- The bonfire
+    I.push({
+      pos: L.bonfire, r: 5,
+      label: () => (this.bonfireActive() && !s.flags.bonfireDone ? 'Join the bonfire' : null),
+      act: () => this.bonfireFinale(),
+    });
+
     this.interactables = I;
   }
 
@@ -614,6 +704,92 @@ export class Game {
     });
   }
 
+  fishing() {
+    const s = this.s;
+    s.today.fishing++;
+    this.busy = true;
+    this.player.unlock();
+    this.ui.fishing((results) => {
+      const cards = [];
+      const fx = { relax: 8 };
+      let caught = 0;
+      for (const r of results) {
+        if (r === 'early') cards.push('You yank the line too early. Somewhere below, a fish laughs at you.');
+        else if (r === 'missed') cards.push('Something nibbles, tugs, and is gone. The sea keeps its secrets.');
+        else {
+          const pool = CATCHES.filter((c) => !(c.once && s.flags['caught_' + c.id]));
+          let w = Math.random() * pool.reduce((t, c) => t + c.weight, 0);
+          let c = pool[0];
+          for (const x of pool) if ((w -= x.weight) <= 0) { c = x; break; }
+          if (Math.random() < 0.12) {
+            cards.push('You reel in a beautiful fish. Kevin drops out of the sky, takes it, and leaves. He does not look back.');
+            fx.fun = (fx.fun || 0) + 3;
+            continue;
+          }
+          caught++;
+          cards.push(c.text);
+          for (const [k, v] of Object.entries(c.fx)) fx[k] = (fx[k] || 0) + v;
+          if (c.once) this.setFlag('caught_' + c.id);
+          if (c.item) this.give(c.item);
+        }
+      }
+      this.ui.narrate(cards, () => {
+        this.passTime(0.75);
+        this.fx(fx);
+        if (caught) this.memory('fishing', 'Fished off the end of the dock as the boats bobbed. Caught more than fish.');
+        this.busy = false;
+        this.player.lock();
+      }, true);
+    });
+  }
+
+  bonfireFinale() {
+    const s = this.s;
+    const f = s.flags;
+    const has = (id) => s.memories.some((m) => m.id === id);
+    const cards = ['The bonfire crackles on the sand. Sparks drift up into more stars than you knew existed. One by one, everyone you met this week finds a seat.'];
+    cards.push(
+      f.metDez
+        ? "Dez hands round drinks he's calling The Goodbye For Now. 'You came in with your shoulders up by your ears,' he tells you. 'Look at them. Practically at sea level.'"
+        : "Dez, the bartender you never quite got to know, hands you a drink and nods like he knows you anyway."
+    );
+    cards.push(
+      f.brendaRelaxed
+        ? "Brenda arrives forty minutes late and doesn't apologize. She's wearing her old itinerary as a hat."
+        : "Brenda arrives at 19:30 exactly, with a laminated bonfire agenda. Item one: 'Feel feelings (optional).'"
+    );
+    cards.push(
+      f.garyBuried
+        ? "Gary is barefoot with a flower behind his ear. Someone asks what he does for work. He genuinely can't remember, and he's thrilled."
+        : f.garyDone
+          ? "Gary's phone buzzes. He looks at it, looks at the fire, and drops it into his drink. It's waterproof. He's a little disappointed."
+          : "Gary holds his laptop up to the stars. 'One bar,' he whispers. 'I can see one bar.'"
+    );
+    cards.push(
+      has('turtle')
+        ? 'The Captain tells the story of Doris the sea turtle again. It is longer this time. Doris now owes him a car.'
+        : "The Captain finally admits The Unsinkable I sank. Everyone applauds his honesty. He looks lighter."
+    );
+    cards.push(
+      has('yoga')
+        ? "Marisol announces your aura is officially 'sunset apricot.' She has never been prouder of a stranger."
+        : "Marisol says your aura is 'a work in progress, like the ocean.' You decide to take that as a compliment."
+    );
+    cards.push(
+      f.beatPearl
+        ? 'Nana Pearl demands a rematch next year. She has already started training. She is eighty-four.'
+        : 'Nana Pearl wins a marshmallow-roasting contest nobody else knew was happening. She gloats for twenty minutes.'
+    );
+    if (f.foundLair || has('kevin')) cards.push('Kevin lands at the edge of the firelight with a churro. Nobody knows where he got it. Nobody asks.');
+    cards.push("The fire burns down to embers. A wave folds onto the sand, then another. For the first time in a long time, you are not thinking about Monday.");
+    this.setFlag('bonfireDone');
+    this.narrate(cards, () => {
+      this.fx({ fun: 20, relax: 25 });
+      this.memory('bonfire', 'Shared a bonfire with everyone on the last night. Even Kevin came.');
+      this.ui.toast('Your bed is in bungalow 7 whenever you are ready.', 'neutral');
+    }, 1.5);
+  }
+
   volleyball() {
     this.busy = true;
     this.player.unlock();
@@ -730,6 +906,24 @@ export class Game {
     }
     s.sunscreen = Math.max(0, s.sunscreen - dh * (p.swimming ? 2 : 1));
 
+    // Out on the water
+    if (p.kayak) {
+      s.today.kayak = (s.today.kayak || 0) + dh;
+      const m = Math.exp(-s.today.kayak / 1.5);
+      s.fun += 6 * m * dh;
+      s.relax += 2.5 * m * dh;
+      s.energy -= 3 * dh;
+    }
+    if (!s.flags.sawCove && Math.hypot(pos.x - this.L.cove.x, pos.z - this.L.cove.z) < 28) {
+      this.setFlag('sawCove');
+      this.ui.toast("There's something strange on the little beach in this hidden cove...", 'item');
+    }
+    this.world.setBonfire(this.bonfireActive());
+    if (s.day >= VACATION_DAYS && s.hour >= 18.5 && !s.flags.bonfireAnnounced) {
+      this.setFlag('bonfireAnnounced');
+      this.ui.toast("Dez, from across the beach: 'Bonfire tonight, half seven. Everyone's coming. Even Kevin, probably.'", 'item');
+    }
+
     // The sea
     if (p.swimming) {
       s.today.swim = (s.today.swim || 0) + dh;
@@ -824,6 +1018,9 @@ export class Game {
     if (f.metPearl) add(!!f.beatPearl, 'Nana Pearl plays volleyball on the south beach during the day. Beat her. If you can.');
     if (f.metMarisol) add(s.memories.some((m) => m.id === 'yoga'), 'Marisol leads sunset yoga on the west deck, around 5 to 7:30 pm.');
     if (f.metCaptain) add(s.memories.some((m) => m.id === 'turtle'), 'Captain Lorenzo runs snorkel tours from the dock, 9 am to 4 pm ($60).');
+    if (s.flags.bonfireAnnounced) add(!!s.flags.bonfireDone, 'Last night of the trip: bonfire on the main beach from 7:30 pm. Everyone will be there.');
+    if (s.items.sandal) add(false, "You fished up a sandal with 'GARY' written inside. Someone might want it back.");
+    if (s.items.ring) add(false, "A gold ring from Kevin's nest. Someone on this island has been missing it for a long time.");
     if (s.items.phone) add(false, 'Your phone keeps buzzing. You could hand it to Dez, or find a more permanent solution.');
     add(s.shells >= this.world.shells.length, `Pretty shells found: ${s.shells} / ${this.world.shells.length}. They glint on the beaches.`);
     return out;

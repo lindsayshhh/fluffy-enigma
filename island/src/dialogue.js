@@ -393,6 +393,7 @@ export const CHARACTERS = {
         choices: [
           { text: "I heard there's signal up on the hill by the lighthouse.", if: (s) => s.flags.knowsWifi && !s.flags.garyToLighthouse, set: ['garyToLighthouse'], go: 'lighthouse' },
           { text: 'Gary... what if you just didn\'t send it?', if: (s) => !s.flags.garyToLighthouse && (s.relax >= 55 || !s.items.phone), go: 'nosend' },
+          { text: 'I think this is your sandal?', if: (s) => s.items.sandal, go: 'sandal' },
           { text: 'Any luck so far?', go: 'luck' },
           { text: 'Good luck, Gary.', end: true },
         ],
@@ -450,6 +451,21 @@ export const CHARACTERS = {
           },
         ],
       },
+      sandal: {
+        text: "My SANDAL. You found my sandal! I lost it in the surf chasing one bar of signal. My nan gave me these. Well, she gave me a gift card and I bought these. Same thing.",
+        choices: [
+          {
+            text: 'Found it fishing, actually.',
+            act: (g) => {
+              g.take('sandal');
+              g.fx({ fun: 8, relax: 5 });
+              g.memory('sandal', "Fished up Gary's lost sandal and returned it. He held it like a newborn.");
+            },
+            go: 'sandal2',
+          },
+        ],
+      },
+      sandal2: { text: "Gary puts it on immediately, then the other one, then takes them both off again to feel the sand. 'Balance,' he says.", choices: [{ text: '(nod)', end: true }] },
       closeLaptop: { text: 'Gary closes the laptop. Gently. Like a book he has finished.', choices: [{ text: '(nod)', end: true }] },
       free: {
         text: (s, g) =>
@@ -458,7 +474,10 @@ export const CHARACTERS = {
             'I had a churro. Kevin took half. I let him. We have an understanding now.',
             "I haven't thought about a spreadsheet in hours. I can't remember what a pivot table is. It's beautiful.",
           ]),
-        choices: [{ text: 'Proud of you, Gary.', fx: { relax: 2 }, end: true }],
+        choices: [
+          { text: 'I think this is your sandal?', if: (s) => s.items.sandal, go: 'sandal' },
+          { text: 'Proud of you, Gary.', fx: { relax: 2 }, end: true },
+        ],
       },
     },
   },
@@ -539,11 +558,27 @@ export const CHARACTERS = {
         choices: [
           { text: "Let's play. First to three.", if: (s) => s.today.volley < 2 && s.energy >= 12, close: true, act: (g) => g.volleyball() },
           { text: "I'm too tired to play right now.", if: (s) => s.energy < 12, go: 'tired' },
+          { text: 'Does this ring mean anything to you?', if: (s) => s.items.ring, go: 'ring' },
           { text: 'Any life advice?', go: 'advice' },
           { text: 'How did you get so good?', if: (s) => !s.flags.askedPearl, set: ['askedPearl'], go: 'origin' },
           { text: 'Bye, Pearl.', end: true },
         ],
       },
+      ring: {
+        text: "Pearl goes very still. 'That's Ricardo's ring. It vanished off my beach towel in 1998. I always said it was a seagull. Nobody believed me.' She turns it over. 'Kevin?' You nod. 'Kevin's grandfather, then. It runs in the family.'",
+        choices: [
+          {
+            text: 'It belongs with you.',
+            act: (g) => {
+              g.take('ring');
+              g.fx({ fun: 10, relax: 12 });
+              g.memory('ring', "Returned Ricardo's ring to Nana Pearl, twenty-eight years after a seagull stole it.");
+            },
+            go: 'ring2',
+          },
+        ],
+      },
+      ring2: { text: "She puts it on a chain around her neck. 'Rematch tomorrow, rookie. I'm going to play even better now. Ricardo's watching.'", choices: [{ text: 'Looking forward to losing.', end: true }] },
       tired: { text: "Tired? I'm eighty-four and I did a cartwheel this morning. Go have a nap, rookie. Then come back and lose.", choices: [{ text: 'Okay.', go: 'hub' }] },
       advice: {
         text: (s, g) =>

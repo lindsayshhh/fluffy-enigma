@@ -50,6 +50,44 @@ const GradeShader = {
     }`,
 };
 
+// Light shafts: march from each pixel toward the sun on screen and gather
+// bright sky that isn't blocked, so light streams through gaps in the palms.
+// Runs on the HDR image before tone mapping.
+const ShaftShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uSun: { value: new THREE.Vector2(0.5, 0.5) },
+    uColor: { value: new THREE.Color(1, 0.9, 0.7) },
+    uStrength: { value: 0 },
+    uThreshold: { value: 1.6 },
+  },
+  vertexShader: GradeShader.vertexShader,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform vec2 uSun;
+    uniform vec3 uColor;
+    uniform float uStrength, uThreshold;
+    varying vec2 vUv;
+    void main() {
+      vec4 base = texture2D(tDiffuse, vUv);
+      if (uStrength <= 0.0) { gl_FragColor = base; return; }
+      const int STEPS = 36;
+      vec2 delta = (uSun - vUv) * (0.9 / float(STEPS));
+      vec2 uv = vUv;
+      float decay = 1.0, acc = 0.0;
+      for (int i = 0; i < STEPS; i++) {
+        uv += delta;
+        vec3 c = texture2D(tDiffuse, clamp(uv, 0.0, 1.0)).rgb;
+        acc += max(dot(c, vec3(0.2126, 0.7152, 0.0722)) - uThreshold, 0.0) * decay;
+        decay *= 0.955;
+      }
+      float shafts = acc / float(STEPS);
+      // Weaker far from the sun on screen.
+      shafts *= smoothstep(1.2, 0.0, length(uSun - vUv));
+      gl_FragColor = vec4(base.rgb + uColor * shafts * uStrength, base.a);
+    }`,
+};
+
 // Ambient occlusion that ignores the (transparent) sea surface and the sky.
 class SceneAO extends GTAOPass {
   constructor(scene, camera, w, h, skip) {
@@ -80,6 +118,9 @@ export class Post {
     this.ao.blendIntensity = 0.85;
     this.composer.addPass(this.ao);
 
+    this.shafts = new ShaderPass(ShaftShader);
+    this.composer.addPass(this.shafts);
+
     this.bokeh = new BokehPass(scene, camera, { focus: 3, aperture: 0.004, maxblur: 0.006 });
     this.bokeh.enabled = false;
     this.composer.addPass(this.bokeh);
@@ -109,6 +150,21 @@ export class Post {
   }
 
   // focus: distance in metres to keep sharp, or null for no depth of field.
+  // sunDir: world direction to the sun; elevation in degrees; sunColor.
+  setSun(sunDir, elevation, sunColor, underwater) {
+    const u = this.shafts.uniforms;
+    const cam = this.camera;
+    const fwd = cam.getWorldDirection(new THREE.Vector3());
+    const facing = fwd.dot(sunDir);
+    const p = cam.position.clone().addScaledVector(sunDir, 1000).project(cam);
+    u.uSun.value.set(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5);
+    // Strongest when looking toward a low sun; off underwater and at night.
+    const low = 0.45 + 0.9 * (1 - Math.min(1, Math.max(0, (elevation - 5) / 40)));
+    const want = underwater || elevation < -1 || facing < 0.2 ? 0 : Math.min(1, (facing - 0.2) / 0.5) * low * 0.9;
+    u.uStrength.value += (want - u.uStrength.value) * 0.1;
+    u.uColor.value.copy(sunColor);
+  }
+
   render(dt, t, { focus = null, underwater = false } = {}) {
     const g = this.grade.uniforms;
     g.uTime.value = t;

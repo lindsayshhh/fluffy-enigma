@@ -57,6 +57,14 @@ export function computeLayout() {
 
   L.reef = { x0: 60, x1: 125, z0: shoreZ(92) + 22, z1: shoreZ(92) + 46 };
 
+  // Activities
+  L.kayak = { x: 58, z: shoreZ(58) - 2.5 };
+  L.bonfire = { x: -6, z: shoreZ(-6) - 8 };
+  L.fishing = { x: L.dock.x + 3.5, z: L.dock.z1 - 1.2 };
+  const coveShore = findShore(0, 0, 1, -0.42);
+  const coveIn = Math.hypot(coveShore.x, coveShore.z);
+  L.cove = { x: coveShore.x - (coveShore.x / coveIn) * 3, z: coveShore.z - (coveShore.z / coveIn) * 3, sea: { x: coveShore.x + (coveShore.x / coveIn) * 12, z: coveShore.z + (coveShore.z / coveIn) * 12 } };
+
   const bwStart = { x: L.bungalows[1].x, z: L.bungalows[1].walk0 };
   L.paths = [
     [bwStart, { x: -80, z: bShore - 12 }, { x: L.bar.x - 6, z: L.bar.z - 4 }],

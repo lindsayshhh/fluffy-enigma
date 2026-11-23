@@ -105,6 +105,8 @@ export class SkySystem {
 
     this.buildStars();
     this.buildClouds();
+    this.clouds.visible = false;
+    this.buildCloudDeck();
   }
 
   buildStars() {
@@ -129,6 +131,73 @@ export class SkySystem {
     const mg = new THREE.SphereGeometry(60, 24, 16);
     this.moonMesh = new THREE.Mesh(mg, new THREE.MeshBasicMaterial({ color: 0xf1efe6, fog: false, transparent: true }));
     this.scene.add(this.moonMesh);
+  }
+
+  // A high cloud deck: one big plane, shaded per pixel from layered noise,
+  // lit from the sun's side and drifting with the wind. Replaces the old
+  // flat cloud sprites (kept below as this.clouds, hidden, for the sky
+  // tint code).
+  buildCloudDeck() {
+    this.cloudUniforms = {
+      uTime: { value: 0 },
+      uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+      uSunColor: { value: new THREE.Color(1, 1, 1) },
+      uSky: { value: new THREE.Color(0.6, 0.75, 0.9) },
+      uShade: { value: new THREE.Color(0.55, 0.6, 0.7) },
+      uLight: { value: 1 },
+      uCover: { value: 0.43 },
+    };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.cloudUniforms,
+      vertexShader: /* glsl */ `
+        varying vec3 vW;
+        void main() {
+          vec4 w = modelMatrix * vec4(position, 1.0);
+          vW = w.xyz;
+          gl_Position = projectionMatrix * viewMatrix * w;
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform float uTime, uLight, uCover;
+        uniform vec3 uSunDir, uSunColor, uSky, uShade;
+        varying vec3 vW;
+        float h(vec2 p) { p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 34.5); return fract(p.x * p.y); }
+        float n(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+        float fbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { s += a * n(p); p = p * 2.03 + 7.1; a *= 0.5; } return s; }
+        float density(vec2 p) {
+          vec2 q = p * 0.00055 + vec2(uTime * 0.0035, uTime * 0.0012);
+          float d = fbm(q + fbm(q * 0.5) * 0.6);
+          return smoothstep(uCover, uCover + 0.16, d);
+        }
+        void main() {
+          vec3 toW = vW - cameraPosition;
+          float dist = length(toW);
+          vec3 dir = toW / dist;
+          float d = density(vW.xz);
+          if (d < 0.01) discard;
+          // Self-shadowing: how much cloud lies between here and the sun.
+          vec2 sunStep = normalize(uSunDir.xz + 1e-4) * 140.0;
+          float occ = density(vW.xz + sunStep) * 0.5 + density(vW.xz + sunStep * 2.2) * 0.35;
+          float lit = clamp(1.0 - occ * 0.9, 0.15, 1.0);
+          // Bright rims when looking toward the sun through thin cloud.
+          float silver = pow(max(dot(dir, normalize(uSunDir)), 0.0), 8.0) * (1.0 - d) * 1.5;
+          vec3 col = mix(uShade, uSunColor * 1.25, lit) + uSunColor * silver;
+          col = mix(col, uSky, 0.15) * uLight;
+          // Fade into the haze toward the horizon.
+          float horizon = smoothstep(0.02, 0.16, dir.y);
+          gl_FragColor = vec4(col, min(1.0, d * 1.25) * horizon * 0.96);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+      transparent: true,
+      depthWrite: false,
+      fog: false,
+    });
+    this.cloudDeck = new THREE.Mesh(new THREE.PlaneGeometry(16000, 16000, 1, 1).rotateX(Math.PI / 2), mat);
+    this.cloudDeck.position.y = 900;
+    this.cloudDeck.renderOrder = -1;
+    this.cloudDeck.frustumCulled = false;
+    this.scene.add(this.cloudDeck);
   }
 
   buildClouds() {
@@ -190,6 +259,16 @@ export class SkySystem {
     this.stars.rotation.y = hour * 0.02;
 
     const cloudTint = new THREE.Color(1, 1, 1).lerp(s.sun, 0.45).multiplyScalar(Math.max(0.1, Math.min(1.7, s.sunI / 2 + 0.1)));
+    const cu = this.cloudUniforms;
+    cu.uTime.value += dt;
+    cu.uSunDir.value.copy(this.dir);
+    cu.uSunColor.value.copy(s.sun).lerp(new THREE.Color(1, 1, 1), smoothstep(5, 35, el) * 0.6);
+    cu.uSky.value.copy(s.hor);
+    // Cloud undersides: a soft blue-grey taken from the sky, never muddy.
+    cu.uShade.value.copy(s.hor).lerp(s.zen, 0.35).lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(0.82);
+    cu.uLight.value = Math.max(0.06, Math.min(1.4, s.sunI / 2.4 + 0.08));
+    this.cloudDeck.position.x = focus.x;
+    this.cloudDeck.position.z = focus.z;
     for (const sp of this.clouds.children) {
       sp.position.x += sp.userData.speed * dt;
       if (sp.position.x > 3600) sp.position.x = -3600;

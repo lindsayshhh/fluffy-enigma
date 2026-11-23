@@ -73,7 +73,85 @@ export class Player {
     this.pitch = 0;
   }
 
+  // ------------------------------------------------------------ kayaking
+  // Launch from a beach spot: find open water heading out to sea.
+  startKayak(mesh, from) {
+    let x = from.x;
+    let z = from.z;
+    const len = Math.hypot(x, z) || 1;
+    for (let i = 0; i < 200 && height(x, z) > -0.45; i++) {
+      x += (x / len) * 0.25;
+      z += (z / len) * 0.25;
+    }
+    this.kayak = mesh;
+    this.boatYaw = Math.atan2(-x / len, -z / len);
+    this.boatSpeed = 0;
+    this.yaw = this.boatYaw;
+    this.pitch = -0.05;
+    this.pos.set(x, 0, z);
+    this.vel.set(0, 0, 0);
+    this.swimming = false;
+  }
+
+  // Step out onto the nearest dry sand. Returns false if there's none close.
+  stopKayak() {
+    for (let r = 0.5; r <= 7; r += 0.25) {
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 16) {
+        const x = this.pos.x + Math.cos(a) * r;
+        const z = this.pos.z + Math.sin(a) * r;
+        if (height(x, z) > 0.12) {
+          const mesh = this.kayak;
+          this.kayak = null;
+          this.teleport(x, z, undefined, this.yaw);
+          return mesh;
+        }
+      }
+    }
+    return false;
+  }
+
+  nearShore() {
+    for (let r = 0.5; r <= 7; r += 0.5) for (let a = 0; a < 6.28; a += 0.4) if (height(this.pos.x + Math.cos(a) * r, this.pos.z + Math.sin(a) * r) > 0.12) return true;
+    return false;
+  }
+
+  updateKayak(dt, t) {
+    const k = this.keys;
+    const active = this.enabled;
+    const f = active ? (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0) : 0;
+    const turn = active ? (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0) - (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) : 0;
+    this.boatSpeed = THREE.MathUtils.damp(this.boatSpeed, f > 0 ? 4.2 : f < 0 ? -1.6 : 0, f ? 1.4 : 0.6, dt);
+    const dYaw = turn * dt * (0.5 + Math.min(1, Math.abs(this.boatSpeed) / 3) * 0.8);
+    this.boatYaw += dYaw;
+    this.yaw += dYaw; // the view turns with the boat
+    const nx = this.pos.x - Math.sin(this.boatYaw) * this.boatSpeed * dt;
+    const nz = this.pos.z - Math.cos(this.boatYaw) * this.boatSpeed * dt;
+    // Run aground in the shallows rather than driving up the beach.
+    if (height(nx, nz) < waveHeight(nx, nz, t) - 0.12 && Math.hypot(nx, nz) < BOUNDS) {
+      this.pos.x = nx;
+      this.pos.z = nz;
+    } else {
+      this.boatSpeed *= 0.2;
+      if (Math.hypot(nx, nz) >= BOUNDS && this.onBounds) this.onBounds();
+    }
+    this.world.collide(this.pos, 0.5, -1);
+    const surface = waveHeight(this.pos.x, this.pos.z, t);
+    this.pos.y = surface;
+    const m = this.kayak;
+    m.position.set(this.pos.x, surface + 0.02, this.pos.z);
+    m.rotation.set(Math.sin(t * 1.1) * 0.03, this.boatYaw, Math.sin(t * 0.9 + 1) * 0.05);
+    this.running = false;
+    this.swimming = false;
+    this.onGround = false;
+    this.bob += dt * Math.abs(this.boatSpeed);
+    this.camera.position.set(this.pos.x, surface + 0.85 + Math.sin(t * 1.1) * 0.03, this.pos.z);
+    this.camera.rotation.set(this.pitch, this.yaw, Math.sin(t * 0.9 + 1) * 0.03, 'YXZ');
+    this.underwater = false;
+    this.groundHeight = height(this.pos.x, this.pos.z);
+  }
+
   update(dt, t) {
+    if (this.kayak) return this.updateKayak(dt, t);
     const k = this.keys;
     const active = this.enabled;
     if (active) {
@@ -167,6 +245,7 @@ export class Player {
   // Place the camera at the player's eyes (called again after anything
   // nudges the player, so the view never lags a frame behind).
   syncCamera(t) {
+    if (this.kayak) return;
     const moving = Math.hypot(this.vel.x, this.vel.z);
     const bobY = this.swimming ? Math.sin(t * 1.3) * 0.03 : Math.sin(this.bob * 2) * 0.035 * Math.min(1, moving / 3);
     this.camera.position.set(this.pos.x, this.pos.y + EYE + bobY, this.pos.z);

@@ -63,6 +63,8 @@ export class UI {
     if (s.items.snack) st.push('<span title="Churro to go">🥨 churro</span>');
     if (s.items.coconut) st.push('<span title="A coconut with history">🥥</span>');
     if (s.items.voucher) st.push('<span title="Snorkel voucher">🎟️</span>');
+    if (s.items.sandal) st.push('<span title="A sandal with GARY written inside">🩴 sandal</span>');
+    if (s.items.ring) st.push('<span title="A gold ring from Kevin\'s nest">💍 ring</span>');
     if (s.shells) st.push(`<span title="Pretty shells">🐚 ${s.shells}</span>`);
     $('#status').innerHTML = st.join('');
   }
@@ -296,6 +298,88 @@ export class UI {
         ball.style.left = `${x * 100}%`;
         requestAnimationFrame(loop);
       }
+    };
+    requestAnimationFrame(loop);
+  }
+
+  fishing(done) {
+    const m = this.mg;
+    m.className = 'show fish';
+    m.innerHTML = `
+      <h2>Fishing off the dock</h2>
+      <p class="sub">Watch the bobber. When it dips, strike with <kbd>Space</kbd> (or click). Too early and you'll spook them.</p>
+      <div class="pond"><div class="ripple"></div><div class="bobber"><i></i></div></div>
+      <div class="casts"></div>
+      <div class="call">Casting...</div>`;
+    const bob = m.querySelector('.bobber');
+    const ripple = m.querySelector('.ripple');
+    const call = m.querySelector('.call');
+    const castsEl = m.querySelector('.casts');
+    const results = [];
+    let state = 'wait';
+    let timer = 1.6 + Math.random() * 3;
+    let t = 0;
+    let last = performance.now();
+    let over = false;
+    const showCasts = () => {
+      const icon = { caught: '🐟', early: '💨', missed: '〰️' };
+      castsEl.textContent = [0, 1, 2].map((i) => (results[i] ? icon[results[i]] : '·')).join('  ');
+    };
+    showCasts();
+    const finishCast = (r, text) => {
+      results.push(r);
+      showCasts();
+      call.textContent = text;
+      state = 'pause';
+      timer = 1.3;
+      this.audio.blip(r === 'caught' ? 'good' : 'miss');
+    };
+    const strike = () => {
+      if (over) return;
+      if (state === 'wait') finishCast('early', 'Too early! The ripples settle. Nothing there.');
+      else if (state === 'bite') finishCast('caught', 'Got something! Reeling it in...');
+    };
+    m.onclick = strike;
+    this.keyHandler = (e) => {
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault();
+        strike();
+      }
+    };
+    const loop = (now) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      t += dt;
+      timer -= dt;
+      let dip = 0;
+      if (state === 'wait') {
+        dip = Math.sin(t * 2.2) * 3 + (Math.random() < 0.02 ? 4 : 0); // idle bobbing and the odd nibble
+        if (timer <= 0) {
+          state = 'bite';
+          timer = 0.85;
+          call.textContent = 'BITE! Strike now!';
+          this.audio.blip('hit');
+        }
+      } else if (state === 'bite') {
+        dip = 22 + Math.sin(t * 30) * 4;
+        if (timer <= 0) finishCast('missed', 'It got away.');
+      } else if (state === 'pause' && timer <= 0) {
+        if (results.length >= 3) {
+          over = true;
+          m.className = '';
+          m.onclick = null;
+          this.keyHandler = null;
+          done(results);
+          return;
+        }
+        state = 'wait';
+        timer = 1.6 + Math.random() * 3;
+        call.textContent = 'You cast again. The line settles...';
+      }
+      bob.style.transform = `translate(-50%, calc(-50% + ${dip}px))`;
+      ripple.style.opacity = state === 'bite' ? 1 : 0.35;
+      ripple.style.transform = `translate(-50%, -50%) scale(${1 + (state === 'bite' ? 0.6 + Math.sin(t * 20) * 0.2 : Math.sin(t * 2) * 0.1)})`;
+      requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
   }

@@ -470,6 +470,9 @@ export class World {
       ...L.loungers.map((l) => ({ x: l.x, z: l.z, r: 3 })),
       ...L.bungalows.map((b) => ({ x: b.x, z: (b.walk0 + b.z) / 2, r: 4, line: true })),
       { x: L.dock.x, z: L.dock.z0, r: 4 },
+      { x: L.kayak.x, z: L.kayak.z, r: 5 },
+      { x: L.bonfire.x, z: L.bonfire.z, r: 7 },
+      { x: L.cove.x, z: L.cove.z, r: 6 },
     ];
 
     this.buildPalms();
@@ -486,6 +489,9 @@ export class World {
     this.buildYoga();
     this.buildSigns();
     this.buildShells();
+    this.buildKayaks();
+    this.buildBonfire();
+    this.buildKevinsLair();
   }
 
   add(obj, cast = true, receive = true) {
@@ -1527,6 +1533,167 @@ export class World {
     }
   }
 
+  // ---------------------------------------------------------------- activities
+  makeKayak(colour = 0xff6b1a) {
+    const g = new THREE.Group();
+    const hullMat = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.35 });
+    const hull = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12), hullMat);
+    hull.scale.set(0.36, 0.17, 1.75);
+    const cockpit = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.06, 20), MAT.black);
+    cockpit.scale.z = 1.6;
+    cockpit.position.set(0, 0.15, 0.05);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.35), MAT.black);
+    seat.position.set(0, 0.1, 0.1);
+    // Paddle across the cockpit.
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 2.2, 8), MAT.metal);
+    shaft.rotation.z = Math.PI / 2;
+    shaft.position.set(0, 0.22, -0.25);
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0x1d4e89, roughness: 0.5 });
+    for (const sx of [-1.1, 1.1]) {
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.012, 0.42), bladeMat);
+      blade.position.set(sx, 0.22, -0.25);
+      g.add(blade);
+    }
+    g.add(hull, cockpit, seat, shaft);
+    g.traverse((o) => (o.castShadow = o.receiveShadow = true));
+    g.userData.paddle = g.children.filter((c) => c.geometry && c.geometry.type === 'BoxGeometry' && c.material === bladeMat).concat([shaft]);
+    return g;
+  }
+
+  buildKayaks() {
+    const K = this.L.kayak;
+    const g = height(K.x, K.z);
+    // A little rental rack: two posts, a crossbar and a hand-painted sign.
+    for (const s of [-1.6, 1.6]) this.cyl(0.06, 0.07, 1.4, MAT.woodDark, K.x + s, g + 0.6, K.z - 2.2, null, 6);
+    this.box(3.6, 0.08, 0.08, MAT.woodDark, K.x, g + 1.15, K.z - 2.2);
+    const tex = T.textTexture(['KAYAKS', { text: 'free · please return · beware of Kevin', font: 'italic 40px Georgia, serif' }], { h: 220 });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.32), new THREE.MeshStandardMaterial({ map: tex }));
+    sign.position.set(K.x, g + 1.45, K.z - 2.18);
+    sign.rotation.y = Math.PI;
+    this.scene.add(sign);
+    this.kayaks = [];
+    [[-0.7, 0xff6b1a], [0.7, 0x2ec4b6]].forEach(([dx, c]) => {
+      const k = this.makeKayak(c);
+      k.position.set(K.x + dx, g + 0.12, K.z);
+      k.rotation.y = 0.15;
+      this.scene.add(k);
+      this.kayaks.push(k);
+    });
+    this.colliders.push({ x: K.x, z: K.z, r: 1.0 });
+  }
+
+  buildBonfire() {
+    const B = this.L.bonfire;
+    const g = height(B.x, B.z);
+    const fire = new THREE.Group();
+    fire.position.set(B.x, g, B.z);
+    // Stone ring and a teepee of driftwood.
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const st = new THREE.Mesh(rockGeometry(i + 40, 1), MAT.rock);
+      st.scale.setScalar(0.22 + (i % 3) * 0.04);
+      st.position.set(Math.cos(a) * 0.95, 0.05, Math.sin(a) * 0.95);
+      fire.add(st);
+    }
+    const drift = new THREE.MeshStandardMaterial({ color: 0x8a7a66, roughness: 0.95 });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 1.5, 7), drift);
+      log.position.set(Math.cos(a) * 0.32, 0.55, Math.sin(a) * 0.32);
+      log.rotation.set(Math.sin(a) * 0.45, 0, -Math.cos(a) * 0.45);
+      fire.add(log);
+    }
+    this.flames = [];
+    for (let i = 0; i < 5; i++) {
+      const f = new THREE.Mesh(new THREE.ConeGeometry(0.22 - i * 0.025, 1.0 + i * 0.12, 8, 1, true), MAT.flame.clone());
+      f.material.color.set(i < 2 ? 0xffb347 : 0xff6a1a);
+      f.position.set(Math.cos(i * 2.4) * 0.12, 0.55 + i * 0.05, Math.sin(i * 2.4) * 0.12);
+      fire.add(f);
+      this.flames.push(f);
+    }
+    // Sparks drifting up.
+    const n = 60;
+    const sp = new Float32Array(n * 3);
+    this.sparkData = Array.from({ length: n }, () => ({ t: Math.random() * 3, x: (Math.random() - 0.5) * 0.4, z: (Math.random() - 0.5) * 0.4, s: 0.6 + Math.random() }));
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    this.sparks = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffb35c, size: 0.06, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    fire.add(this.sparks);
+    this.fireLight = new THREE.PointLight(0xff8a3a, 0, 22, 1.5);
+    this.fireLight.position.set(0, 1.2, 0);
+    fire.add(this.fireLight);
+    // Driftwood benches in a circle.
+    this.bonfireSeats = [];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.2;
+      const bx = Math.cos(a) * 3.2;
+      const bz = Math.sin(a) * 3.2;
+      const bench = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 1.6, 8), drift);
+      bench.rotation.set(0, -a, Math.PI / 2);
+      bench.position.set(bx, 0.15, bz);
+      fire.add(bench);
+      this.bonfireSeats.push({ x: B.x + Math.cos(a) * 2.5, z: B.z + Math.sin(a) * 2.5, face: Math.atan2(-Math.cos(a), -Math.sin(a)) });
+    }
+    fire.traverse((o) => {
+      if (o.isMesh && o.material !== MAT.flame && !this.flames.includes(o)) o.castShadow = o.receiveShadow = true;
+    });
+    fire.visible = false;
+    this.scene.add(fire);
+    this.bonfire = fire;
+    this.colliders.push({ x: B.x, z: B.z, r: 1.2 });
+  }
+
+  setBonfire(on) {
+    if (this.bonfire.visible === on) return;
+    this.bonfire.visible = on;
+  }
+
+  buildKevinsLair() {
+    const C = this.L.cove;
+    const g = height(C.x, C.z);
+    const lair = new THREE.Group();
+    lair.position.set(C.x, g, C.z);
+    // A nest of driftwood twigs.
+    const twig = new THREE.MeshStandardMaterial({ color: 0x7a6248, roughness: 1 });
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2;
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.7, 4), twig);
+      t.position.set(Math.cos(a) * 0.55, 0.08 + (i % 3) * 0.04, Math.sin(a) * 0.55);
+      t.rotation.set(Math.PI / 2, 0, a + 0.4);
+      lair.add(t);
+    }
+    // The hoard: churros, sunglasses, a phone, a lone sandal.
+    const churro = new THREE.MeshStandardMaterial({ color: 0xc8843a, roughness: 0.8 });
+    for (let i = 0; i < 9; i++) {
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.28, 6), churro);
+      c.position.set((Math.random() - 0.5) * 0.6, 0.12 + Math.random() * 0.1, (Math.random() - 0.5) * 0.6);
+      c.rotation.set(Math.random() * 3, Math.random() * 3, Math.PI / 2);
+      lair.add(c);
+    }
+    for (let i = 0; i < 3; i++) {
+      const shades = new THREE.Group();
+      for (const sx of [-0.04, 0.04]) {
+        const lens = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.007, 6, 12), MAT.black);
+        lens.position.x = sx;
+        shades.add(lens);
+      }
+      shades.position.set(-0.2 + i * 0.2, 0.2, 0.15 - i * 0.12);
+      shades.rotation.set(-1.2, i, 0);
+      lair.add(shades);
+    }
+    const phone = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.16), MAT.black);
+    phone.position.set(0.15, 0.17, -0.15);
+    lair.add(phone);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.006, 8, 16), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 1, roughness: 0.2 }));
+    ring.position.set(-0.05, 0.22, 0.02);
+    ring.rotation.x = 1.2;
+    lair.add(ring);
+    this.lairRing = ring;
+    lair.traverse((o) => (o.castShadow = true));
+    this.scene.add(lair);
+    this.lair = { x: C.x, z: C.z, group: lair };
+  }
+
   // ---------------------------------------------------------------- queries
   inShade(x, z) {
     for (const s of this.shade) if ((x - s.x) ** 2 + (z - s.z) ** 2 < s.r * s.r) return true;
@@ -1590,6 +1757,22 @@ export class World {
   }
 
   update(t, dt, night, player) {
+    if (this.bonfire && this.bonfire.visible) {
+      this.flames.forEach((f, i) => {
+        const k = 0.8 + Math.sin(t * (9 + i * 2.3) + i) * 0.12 + Math.sin(t * 23 + i * 5) * 0.08;
+        f.scale.set(1, k, 1);
+        f.rotation.y = t * (0.5 + i * 0.2);
+        f.material.opacity = 0.55 + night * 0.4;
+      });
+      this.fireLight.intensity = (8 + Math.sin(t * 11) * 1.5 + Math.sin(t * 27) * 1) * (0.3 + night * 0.7);
+      const pos = this.sparks.geometry.attributes.position;
+      this.sparkData.forEach((sp, i) => {
+        sp.t += dt * sp.s;
+        if (sp.t > 3) sp.t = 0;
+        pos.setXYZ(i, sp.x + Math.sin(sp.t * 3 + i) * 0.15 * sp.t, 0.8 + sp.t * 1.3, sp.z + Math.cos(sp.t * 2 + i) * 0.15 * sp.t);
+      });
+      pos.needsUpdate = true;
+    }
     for (const tr of this.torches) {
       const f = 0.8 + Math.sin(t * 13 + tr.ph) * 0.1 + Math.sin(t * 29 + tr.ph * 2) * 0.08;
       tr.flame.scale.set(1, f * (0.4 + night * 0.8), 1);

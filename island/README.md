@@ -39,6 +39,12 @@ Play it on a computer with a mouse and keyboard, with sound on.
 - Your **work phone** buzzes every hour or two. You can read it, ignore it, or find a more permanent solution.
 - A day ends when you go to sleep (bed in Bungalow 7, after 8 pm), pass out, or stay up past 2 am. After three days you get a final rating.
 
+### Things to do
+
+- **Kayak**: take one from the rack on the beach east of the dock. `W`/`S` paddles, `A`/`D` steers, and `E` near any beach climbs out. Somewhere along the rocky eastern headland is a hidden cove worth finding.
+- **Fishing**: at the end of the dock, from 6 am to 8 pm. Strike with `Space` when the bobber dips. The sea gives up some odd things, and at least one of them belongs to somebody.
+- **The last night**: on day 3 there's a bonfire on the main beach from 7:30 pm. Everyone comes, and how their evening goes depends on what you did together.
+
 One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 
 ## The locals

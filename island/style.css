@@ -718,3 +718,46 @@ body.ui-free #crosshair {
   letter-spacing: 0.08em;
   opacity: 0.6;
 }
+
+/* fishing */
+#minigame .pond {
+  position: relative;
+  height: 150px;
+  margin: 16px 0 10px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(#2a9fb0, #0b5f79);
+  box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.25);
+}
+#minigame .ripple {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  width: 90px;
+  height: 26px;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s;
+}
+#minigame .bobber {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+}
+#minigame .bobber i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50% 50% 45% 45%;
+  background: linear-gradient(#e63946 0 50%, #f1faee 50% 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+#minigame .casts {
+  font-size: 22px;
+  letter-spacing: 0.2em;
+  min-height: 1.4em;
+}

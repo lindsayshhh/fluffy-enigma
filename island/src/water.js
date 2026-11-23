@@ -58,6 +58,20 @@ float seabed(vec2 p) {
   if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return -32.0;
   return texture2D(uHeight, uv).r;
 }
+float hb(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
+float nb(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f);
+  return mix(mix(hb(i),hb(i+vec2(1,0)),f.x), mix(hb(i+vec2(0,1)),hb(i+vec2(1,1)),f.x), f.y); }
+// Shoreline breakers. x: crest height, y: breaking foam, z: whitewater left behind.
+vec3 breakers(vec2 p, float depth) {
+  float along = nb(p * 0.035) * 6.0;               // sets stagger along the shore
+  float ph = depth * 1.7 + uTime * 0.8 + along;
+  float s = sin(ph);
+  float grow = smoothstep(3.2, 1.3, depth) * smoothstep(0.05, 0.6, depth);
+  float crest = pow(max(s, 0.0), 6.0) * grow;
+  float breaking = smoothstep(0.6, 1.0, pow(max(s, 0.0), 3.0)) * smoothstep(1.8, 0.5, depth) * smoothstep(0.02, 0.3, depth);
+  float wash = pow(max(sin(ph - 0.9), 0.0), 2.0) * smoothstep(1.3, 0.05, depth);
+  return vec3(crest, breaking, wash);
+}
 // Returns height in x, slope in yz.
 vec3 waves(vec2 p, float damp, int count) {
   vec3 r = vec3(0.0);
@@ -81,6 +95,10 @@ void main() {
   float depth = max(0.0, -seabed(wp.xz));
   float damp = 0.35 + 0.65 * smoothstep(0.0, 3.0, depth);
   wp.y += waves(wp.xz, damp, 3).x;
+  vec3 br = breakers(wp.xz, depth);
+  wp.y += br.x * 0.3;
+  // Swash: the sea surges a little way up the sand and draws back.
+  wp.y += (0.5 + 0.5 * sin(uTime * 0.8 + nb(wp.xz * 0.035) * 6.0 + 1.2)) * 0.1 * smoothstep(0.7, 0.0, depth);
   vWPos = wp.xyz;
   vDepth = depth;
   gl_Position = projectionMatrix * viewMatrix * wp;
@@ -157,8 +175,14 @@ void main() {
     float foam = smoothstep(0.3, 0.0, depth) * (0.6 + 0.4 * band);
     foam += smoothstep(0.8, 0.15, depth) * smoothstep(0.7, 0.95, band) * 0.5;
     foam *= smoothstep(0.2, 0.5, n + 0.2);
+    vec3 br = breakers(vWPos.xz, depth);
+    float churn = vn(vWPos.xz * 0.8 + vec2(uTime * 0.6, 0.0)) * vn(vWPos.xz * 2.7 - uTime * 0.4);
+    foam += br.y * smoothstep(0.1, 0.45, churn + 0.15) * 1.2;
+    foam += br.z * smoothstep(0.25, 0.6, churn + 0.1) * 0.75;
     foam = clamp(foam, 0.0, 1.0);
-    col = mix(col, vec3(0.9) * light * uAmbient, foam * 0.8);
+    // Light glows through the thin lip of a cresting wave.
+    col += vec3(0.04, 0.22, 0.2) * br.x * sunUp * light;
+    col = mix(col, vec3(0.92) * light * uAmbient, foam * 0.85);
     alpha = max(alpha, foam * 0.9);
   } else {
     // Seen from below: the bright, wobbly ceiling of the sea.

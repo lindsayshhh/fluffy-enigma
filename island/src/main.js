@@ -171,7 +171,7 @@ async function build() {
   };
 
   try {
-    post = new Post(renderer, scene, camera, { skipAO: [water, sky.sky, sky.clouds, sky.stars, sky.moonMesh] });
+    post = new Post(renderer, scene, camera, { skipAO: [water, sky.sky, sky.clouds, sky.cloudDeck, sky.stars, sky.moonMesh] });
     applyQuality(quality);
   } catch (e) {
     console.warn('Post-processing unavailable; rendering directly.', e);
@@ -315,7 +315,10 @@ function loop() {
     const n = game.npcs[game.talking].pos;
     dof = camera.position.distanceTo(_head.set(n.x, n.y + 1.6, n.z));
   }
-  if (post) post.render(dt, t, { focus: dof, underwater: under });
+  if (post) {
+    post.setSun(sky.dir, sky.elevation, st.sun, under);
+    post.render(dt, t, { focus: dof, underwater: under });
+  }
   else renderer.render(scene, camera);
 }
 const _head = new THREE.Vector3();
