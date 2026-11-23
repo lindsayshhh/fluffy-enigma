@@ -711,3 +711,10 @@ body.ui-free #crosshair {
     padding: 0 0 12px;
   }
 }
+
+#title .build {
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+}

@@ -6,7 +6,29 @@
     <title>Palmera Cay</title>
     <link rel="stylesheet" href="style.css" />
     <script type="importmap">
-      { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/",
+    "./src/assets.js": "./src/assets.js?v=5",
+    "./src/audio.js": "./src/audio.js?v=5",
+    "./src/dialogue.js": "./src/dialogue.js?v=5",
+    "./src/game.js": "./src/game.js?v=5",
+    "./src/humans.js": "./src/humans.js?v=5",
+    "./src/layout.js": "./src/layout.js?v=5",
+    "./src/main.js": "./src/main.js?v=5",
+    "./src/noise.js": "./src/noise.js?v=5",
+    "./src/people.js": "./src/people.js?v=5",
+    "./src/player.js": "./src/player.js?v=5",
+    "./src/post.js": "./src/post.js?v=5",
+    "./src/props.js": "./src/props.js?v=5",
+    "./src/sky.js": "./src/sky.js?v=5",
+    "./src/terrain.js": "./src/terrain.js?v=5",
+    "./src/textures.js": "./src/textures.js?v=5",
+    "./src/ui.js": "./src/ui.js?v=5",
+    "./src/water.js": "./src/water.js?v=5"
+  }
+}
     </script>
   </head>
   <body class="ui-free">
@@ -98,9 +120,10 @@
           <kbd>W A S D</kbd> walk · <kbd>Mouse</kbd> look · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump ·
           <kbd>C</kbd> dive · <kbd>E</kbd> interact · <kbd>J</kbd> journal · Best with sound on, on a computer.<br /><small>Photoscanned textures and models: Poly Haven (CC0) · Characters: Microsoft Rocketbox (MIT) · Palms and plants: Next Spring, evolveduk, MozzarellaARC on Sketchfab (CC BY 4.0)</small>
         </p>
+        <p class="build">Build 5</p>
       </div>
     </div>
 
-    <script type="module" src="src/main.js"></script>
+    <script type="module" src="src/main.js?v=5"></script>
   </body>
 </html>

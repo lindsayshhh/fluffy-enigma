@@ -20,7 +20,8 @@ const MODELS = ['lambis_shell', 'bar_chair_round_01', 'rock_07', 'rock_09'];
 // props.js can split them into individual trees and plants.
 const SCENES = ['palms', 'coconut_palm', 'tropical_plants'];
 
-export const assets = { tex: {}, models: {}, scenes: {} };
+// `failed` lists anything that couldn't load, so the game can say so.
+export const assets = { tex: {}, models: {}, scenes: {}, failed: [] };
 
 export async function loadAssets(renderer, onProgress) {
   const texLoader = new THREE.TextureLoader();
@@ -42,6 +43,7 @@ export async function loadAssets(renderer, onProgress) {
       })
       .catch((e) => {
         console.warn('Texture failed, using procedural fallback:', url, e);
+        assets.failed.push(url.split('/').pop());
         tick();
         return null;
       });
@@ -69,6 +71,7 @@ export async function loadAssets(renderer, onProgress) {
       })
       .catch((e) => {
         console.warn('Model failed, using procedural fallback:', name, e);
+        assets.failed.push(name);
         tick();
       })
   );
@@ -83,6 +86,7 @@ export async function loadAssets(renderer, onProgress) {
       })
       .catch((e) => {
         console.warn('Scene failed, using procedural fallback:', name, e);
+        assets.failed.push(name);
         tick();
       })
   );

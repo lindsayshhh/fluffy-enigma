@@ -55,6 +55,7 @@ let L;
 let started = false;
 let water;
 let post;
+let failedNote = null;
 
 function applyQuality(q) {
   quality = q;
@@ -112,6 +113,7 @@ async function build() {
     extras = made.extras;
   } catch (e) {
     console.warn('Realistic characters failed to load; using the simple ones.', e);
+    assets.failed.push('characters');
   }
   setupExtras(extras);
   const gull = makeSeagull();
@@ -119,6 +121,11 @@ async function build() {
   audio = new Audio();
   ui = new UI(audio);
   player = new Player(camera, world, canvas);
+
+  if (assets.failed.length) {
+    console.warn('Assets that failed to load:', assets.failed);
+    failedNote = `Some realistic models couldn't load (${assets.failed.slice(0, 4).join(', ')}${assets.failed.length > 4 ? ', ...' : ''}), so simpler versions are shown.`;
+  }
 
   const saved = loadSave();
   const fresh = () => {
@@ -181,6 +188,7 @@ function begin(resumed) {
   document.body.classList.remove('ui-free');
   started = true;
   ui.hud(game.s, game, true);
+  if (failedNote) ui.toast(failedNote, 'bad');
   const s = game.s;
   if (resumed) {
     game.narrate([`Day ${s.day}. The sun is already up and so, technically, are you.`], null, 0);
