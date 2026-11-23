@@ -221,7 +221,9 @@ export class SkySystem {
   }
 
   // hour: 0-24 (fractional)
-  update(hour, focus, dt) {
+  // rain: 0..1 from the weather. Overcast skies dim the sun, grey the sky
+  // and fog, and thicken the cloud deck.
+  update(hour, focus, dt, rain = 0) {
     const dayT = (hour - 6.1) / 12.6; // 0 at sunrise, 1 at sunset
     const el = Math.sin(dayT * Math.PI) * 74 * (dayT >= 0 && dayT <= 1 ? 1 : 0.35);
     const elev = THREE.MathUtils.degToRad(el);
@@ -229,6 +231,15 @@ export class SkySystem {
     this.dir.set(Math.cos(az) * Math.cos(elev), Math.sin(elev), Math.sin(az) * Math.cos(elev) * 0.55 + 0.2).normalize();
 
     const s = sample(el);
+    if (rain > 0) {
+      const grey = new THREE.Color(0.55, 0.58, 0.62);
+      s.sunI *= 1 - 0.8 * rain;
+      s.hemiI *= 1 - 0.3 * rain;
+      s.zen.lerp(grey.clone().multiplyScalar(0.8), rain * 0.75);
+      s.hor.lerp(grey, rain * 0.75);
+      s.fog.lerp(grey.clone().multiplyScalar(s.sunI > 0.3 ? 1 : 0.4), rain * 0.8);
+      s.sky.lerp(grey, rain * 0.5);
+    }
     this.state = s;
     this.elevation = el;
 
@@ -266,7 +277,8 @@ export class SkySystem {
     cu.uSky.value.copy(s.hor);
     // Cloud undersides: a soft blue-grey taken from the sky, never muddy.
     cu.uShade.value.copy(s.hor).lerp(s.zen, 0.35).lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(0.82);
-    cu.uLight.value = Math.max(0.06, Math.min(1.4, s.sunI / 2.4 + 0.08));
+    cu.uLight.value = Math.max(0.06, Math.min(1.4, s.sunI / 2.4 + 0.08)) * (1 - rain * 0.35);
+    cu.uCover.value = 0.43 - rain * 0.33;
     this.cloudDeck.position.x = focus.x;
     this.cloudDeck.position.z = focus.z;
     for (const sp of this.clouds.children) {

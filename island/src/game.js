@@ -59,8 +59,8 @@ export function clearSave() {
 }
 
 export class Game {
-  constructor({ world, cast, gull, ui, audio, player, L, sky, state }) {
-    Object.assign(this, { world, cast, gull, ui, audio, player, L, sky });
+  constructor({ world, cast, gull, ui, audio, player, L, sky, weather, state }) {
+    Object.assign(this, { world, cast, gull, ui, audio, player, L, sky, weather });
     this.s = state || newState();
     this.busy = false; // dialogue / narration / minigame
     this.talking = null;
@@ -236,6 +236,13 @@ export class Game {
     return s.day >= VACATION_DAYS && s.hour >= 19.5 && s.hour < 25;
   }
 
+  shelterSpot(key) {
+    const order = ['brenda', 'captain', 'gary', 'marisol', 'pearl'];
+    const a = (order.indexOf(key) / order.length) * Math.PI * 2 + 0.6;
+    const B = this.L.bar;
+    return { x: B.x + Math.cos(a) * 5.4, z: B.z + Math.sin(a) * 5.4, face: Math.atan2(-Math.cos(a), -Math.sin(a)) };
+  }
+
   bonfireSeat(key) {
     const seats = this.world.bonfireSeats;
     const order = ['dez', 'brenda', 'captain', 'gary', 'marisol', 'pearl'];
@@ -246,7 +253,9 @@ export class Game {
   updateNPCs(dt, t) {
     const pp = this.player.pos;
     for (const n of Object.values(this.npcs)) {
-      const target = this.bonfireActive() ? this.bonfireSeat(n.key) : n.def.target(this.s);
+      let target = this.bonfireActive() ? this.bonfireSeat(n.key) : n.def.target(this.s);
+      // In a downpour everyone shelters under the bar roof (Dez is already there).
+      if (target && !this.bonfireActive() && this.weather && this.weather.rain > 0.3 && n.key !== 'dez') target = this.shelterSpot(n.key);
       const P = n.person;
       if (n.key === 'gary') P.pose = this.s.flags.garyDone ? null : 'laptop';
       if (n.key === 'gary' && P.laptop) P.laptop.visible = !this.s.flags.garyBuried && (!this.s.flags.garyDone || this.s.flags.garyToLighthouse);
@@ -313,6 +322,62 @@ export class Game {
         const k = d > 1e-4 ? min / d : 0;
         pp.x = g.position.x + (k ? dx * k : min);
         pp.z = g.position.z + (k ? dz * k : 0);
+      }
+    }
+  }
+
+  updateWeatherMoments(dt) {
+    const s = this.s;
+    const W = this.weather;
+    if (!W) return;
+    const p = this.player;
+    const pos = p.pos;
+    const raining = W.rain > 0.3;
+    if (raining && !this.wasRaining) this.ui.toast("A tropical shower sweeps in off the sea. Everyone's running for the bar.", 'item');
+    if (!raining && this.wasRaining) this.ui.toast('The shower passes. Steam rises off the sand.', 'neutral');
+    this.wasRaining = raining;
+
+    const roofed = this.world.underRoof(pos.x, pos.z);
+    if (W.rain > 0.6 && !roofed && !p.swimming && !p.kayak) {
+      this.rainTime = (this.rainTime || 0) + dt;
+      if (this.rainTime > 12 && !s.memories.some((m) => m.id === 'rain_dance')) {
+        this.fx({ fun: 8, relax: 4 });
+        this.memory('rain_dance', 'Stood out in a warm tropical downpour and laughed while everyone else ran for cover.');
+      }
+    } else this.rainTime = 0;
+
+    if (W.rain > 0.6 && Math.hypot(pos.x - this.L.bar.x, pos.z - this.L.bar.z) < 8.5 && !s.memories.some((m) => m.id === 'downpour')) {
+      const near = Object.values(this.npcs).filter((n) => n.person.group.visible && Math.hypot(n.pos.x - this.L.bar.x, n.pos.z - this.L.bar.z) < 9).length;
+      if (near >= 3) {
+        this.fx({ relax: 8, fun: 5 });
+        this.memory('downpour', "Waited out a downpour at the bar with everyone. Dez invented a drink on the spot and called it The Forecast.");
+      }
+    }
+
+    if (W.rainbow > 0.3 && !this.sawBowToast) {
+      this.sawBowToast = true;
+      this.ui.toast('A rainbow arcs over the sea.', 'item');
+    }
+    if (W.rainbow < 0.05) this.sawBowToast = false;
+    if (W.rainbow > 0.4) {
+      const fwd = p.camera.getWorldDirection(new THREE.Vector3());
+      const anti = this.sky.dir.clone().negate();
+      const h = Math.hypot(fwd.x, fwd.z) * Math.hypot(anti.x, anti.z);
+      if (h > 0 && (fwd.x * anti.x + fwd.z * anti.z) / h > 0.7) {
+        this.bowGaze = (this.bowGaze || 0) + dt;
+        if (this.bowGaze > 3 && !s.memories.some((m) => m.id === 'rainbow')) {
+          this.fx({ relax: 8, fun: 3 });
+          this.memory('rainbow', 'Watched a rainbow come down somewhere out at sea. Brenda tried to schedule the next one.');
+        }
+      }
+    }
+
+    // Glowing plankton: out in the water on a dark night.
+    if (this.sky.elevation < -6 && (p.swimming || (p.kayak && Math.abs(p.boatSpeed) > 0.5))) {
+      this.glowTime = (this.glowTime || 0) + dt;
+      if (this.glowTime > 4 && !s.memories.some((m) => m.id === 'plankton')) {
+        this.fx({ fun: 10, relax: 6 });
+        this.memory('plankton', 'Swam through glowing plankton at night. Every stroke lit the sea electric blue.');
       }
     }
   }
@@ -537,6 +602,28 @@ export class Game {
       pos: L.fishing, y: 1.35, r: 3,
       label: () => (s.hour < 6 || s.hour >= 20 ? null : s.today.fishing < 2 ? 'Go fishing' : null),
       act: () => this.fishing(),
+    });
+
+    // ---- Stargazing on the dock
+    I.push({
+      pos: L.fishing, y: 1.35, r: 3,
+      label: () => ((s.hour >= 20.5 || s.hour < 4) && !s.today.stargazed ? 'Lie back and stargaze' : null),
+      act: () => {
+        s.today.stargazed = true;
+        this.narrate(
+          [
+            'You lie back on the warm planks of the dock. The sea knocks gently against the posts below.',
+            'With no city lights for miles, the sky is ridiculous. The Milky Way spills across it like someone knocked over the sugar.',
+            'You find the Big Dipper, then a cluster of stars you decide is called The Churro. Somewhere in the dark, a seagull disapproves.',
+            "A shooting star crosses the whole sky. You don't make a wish. You realize you don't need one right now.",
+          ],
+          () => {
+            this.fx({ relax: 16, fun: 4 });
+            this.memory('stargaze', 'Lay on the dock and watched a shooting star cross the whole sky.');
+          },
+          0.75
+        );
+      },
     });
 
     // ---- The hidden cove
@@ -897,7 +984,8 @@ export class Game {
     s.energy -= (p.running ? 14 : p.swimming ? 6 : 2.6) * dh;
 
     // Sun
-    const strength = smoothstep(8, 55, this.sky.elevation);
+    const rain = this.weather ? this.weather.rain : 0;
+    const strength = smoothstep(8, 55, this.sky.elevation) * (1 - rain);
     const shaded = this.world.inShade(pos.x, pos.z) || p.underwater;
     if (!shaded && strength > 0) {
       s.sunburn += (s.sunscreen > 0 ? 0.8 : 9) * strength * dh;
@@ -905,6 +993,9 @@ export class Game {
       s.sunburn -= 1.5 * dh;
     }
     s.sunscreen = Math.max(0, s.sunscreen - dh * (p.swimming ? 2 : 1));
+
+    // Weather moments
+    this.updateWeatherMoments(dt);
 
     // Out on the water
     if (p.kayak) {

@@ -8,6 +8,7 @@ export const HILL = { x: 58, z: -48 };
 export const shared = {
   uTime: { value: 0 },
   uSun: { value: 1 },
+  uWet: { value: 0 }, // 0 dry .. 1 soaked after rain
 };
 
 // Height of the ground (land or seabed) in metres. Sea level is 0.
@@ -178,6 +179,7 @@ export function buildTerrain(paths, layers = null) {
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = shared.uTime;
     shader.uniforms.uSun = shared.uSun;
+    shader.uniforms.uWet = shared.uWet;
     if (layers) {
       ['sand', 'wet', 'grass', 'rock'].forEach((k, i) => {
         shader.uniforms[`tD${i}`] = { value: layers[k].map };
@@ -206,6 +208,7 @@ const vec4 TILE = vec4(2.6, 3.0, 2.2, 3.5);
 #endif
 uniform float uTime;
 uniform float uSun;
+uniform float uWet;
 float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
 float vn(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f);
   return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }
@@ -254,7 +257,9 @@ normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
         `#include <roughnessmap_fragment>
 #ifdef TEXTURED
 roughnessFactor = dot(w, vec4(0.95, 0.5, 0.95, 0.9));
-#endif`
+#endif
+// Rain-soaked ground is darker and glossier.
+roughnessFactor *= 1.0 - 0.6 * uWet * smoothstep(0.0, 0.5, vWPos.y);`
       )
       .replace(
         '#include <color_fragment>',
@@ -272,7 +277,8 @@ if (sub > 0.0) {
 }
 // Damp sand right at the waterline.
 float wet = smoothstep(0.9, 0.15, vWPos.y) * smoothstep(-0.4, 0.1, vWPos.y);
-diffuseColor.rgb *= 1.0 - wet*0.22;`
+diffuseColor.rgb *= 1.0 - wet*0.22;
+diffuseColor.rgb *= 1.0 - uWet * 0.28 * smoothstep(0.0, 0.5, vWPos.y);`
       );
   };
   const mesh = new THREE.Mesh(geo, mat);

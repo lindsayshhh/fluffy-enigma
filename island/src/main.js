@@ -13,6 +13,12 @@ import { smoothstep } from './noise.js';
 import { loadAssets } from './assets.js';
 import { loadHumans, makeHumanCast } from './humans.js';
 import { Post } from './post.js';
+import { Weather } from './weather.js';
+import { TouchControls, isTouchDevice } from './touch.js';
+
+const TOUCH = isTouchDevice();
+if (TOUCH) document.body.classList.add('touch');
+let touch = null;
 import { findShore } from './terrain.js';
 
 const canvas = document.getElementById('c');
@@ -32,7 +38,8 @@ renderer.setClearColor(0x0b1530);
 const QUALITY_KEY = 'palmera-cay-quality';
 let quality = 'high';
 try {
-  quality = localStorage.getItem(QUALITY_KEY) || 'high';
+  // Phones and tablets start on the lighter graphics setting.
+  quality = localStorage.getItem(QUALITY_KEY) || (TOUCH ? 'low' : 'high');
 } catch {
   /* storage unavailable */
 }
@@ -55,6 +62,7 @@ let L;
 let started = false;
 let water;
 let post;
+let weather;
 let failedNote = null;
 
 function applyQuality(q) {
@@ -95,6 +103,7 @@ async function build() {
   status('Painting the sky…');
   await step();
   sky = new SkySystem(renderer, scene);
+  weather = new Weather(scene);
   applyQuality(quality);
 
   status('Planting palms…');
@@ -121,6 +130,22 @@ async function build() {
   audio = new Audio();
   ui = new UI(audio);
   player = new Player(camera, world, canvas);
+  if (TOUCH) {
+    player.touchMode = true;
+    touch = new TouchControls(player, {
+      interact: () => {
+        if (!started || game.busy || !player.enabled) return;
+        if (game.focus()) game.interact();
+        else if (player.swimming) {
+          // "Climb out" is Space on a keyboard.
+          player.touchJump = true;
+          setTimeout(() => (player.touchJump = false), 250);
+        }
+      },
+      journal: () => openJournal(),
+      pause: () => openPause(),
+    });
+  }
 
   if (assets.failed.length) {
     console.warn('Assets that failed to load:', assets.failed);
@@ -129,7 +154,7 @@ async function build() {
 
   const saved = loadSave();
   const fresh = () => {
-    const g = new Game({ world, cast, gull, ui, audio, player, L, sky, state: newState() });
+    const g = new Game({ world, cast, gull, ui, audio, player, L, sky, weather, state: newState() });
     return g;
   };
   game = fresh();
@@ -171,14 +196,14 @@ async function build() {
   };
 
   try {
-    post = new Post(renderer, scene, camera, { skipAO: [water, sky.sky, sky.clouds, sky.cloudDeck, sky.stars, sky.moonMesh] });
+    post = new Post(renderer, scene, camera, { skipAO: [water, sky.sky, sky.clouds, sky.cloudDeck, sky.stars, sky.moonMesh, weather.drops, weather.bow, weather.veil] });
     applyQuality(quality);
   } catch (e) {
     console.warn('Post-processing unavailable; rendering directly.', e);
     post = null;
   }
 
-  window.__palmera = { game, player, world, L, sky, post };
+  window.__palmera = { game, player, world, L, sky, post, weather };
   requestAnimationFrame(loop);
 }
 
@@ -207,6 +232,22 @@ function begin(resumed) {
 canvas.addEventListener('click', () => {
   if (started && game && !game.busy && !pauseEl.classList.contains('show')) player.lock();
 });
+function openJournal() {
+  if (!started || game.busy) return;
+  game.busy = true;
+  player.unlock();
+  ui.journal(game.journal(), game.s, () => {
+    game.busy = false;
+    player.lock();
+  });
+}
+
+function openPause() {
+  if (!started || game.busy) return;
+  player.unlock();
+  pauseEl.classList.add('show');
+}
+
 document.getElementById('resume').onclick = () => {
   pauseEl.classList.remove('show');
   player.lock();
@@ -221,14 +262,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Tab') e.preventDefault();
   if (game.busy || !player.enabled) return;
   if (e.code === 'KeyE') game.interact();
-  if (e.code === 'KeyJ') {
-    game.busy = true;
-    player.unlock();
-    ui.journal(game.journal(), game.s, () => {
-      game.busy = false;
-      player.lock();
-    });
-  }
+  if (e.code === 'KeyJ') openJournal();
   if (e.code === 'KeyH') document.body.classList.toggle('ui-free');
 });
 
@@ -256,8 +290,13 @@ function loop() {
     game.keepPlayerOut(extraList.map((e) => e.h.group));
     player.syncCamera(t);
     const f = game.focus();
-    if (f && player.enabled) ui.prompt(f.label);
-    else if (player.enabled && !game.busy && player.swimming && world.platformNear(player.pos.x, player.pos.z, 0.9)) ui.prompt('Climb out', 'Space');
+    const climb = !f && player.enabled && !game.busy && player.swimming && world.platformNear(player.pos.x, player.pos.z, 0.9);
+    if (touch) {
+      // On touch screens the action button carries the prompt.
+      ui.prompt(null);
+      touch.update(f && player.enabled ? f.label : climb ? 'Climb out' : null, !game.busy && player.enabled);
+    } else if (f && player.enabled) ui.prompt(f.label);
+    else if (climb) ui.prompt('Climb out', 'Space');
     else ui.prompt(null);
     ui.hud(game.s, game);
   } else {
@@ -270,7 +309,10 @@ function loop() {
 
   const hour = game ? game.s.hour : 9.5;
   const focus = started ? player.pos : new THREE.Vector3(0, 0, 40);
-  sky.update(hour % 24, focus, dt);
+  weather.update(dt, t, game ? game.s.day : 1, hour % 24, camera, sky.dir);
+  sky.update(hour % 24, focus, dt, weather.rain);
+  shared.uWet.value = weather.wet;
+  weather.setOvercastColor(sky.state.fog);
   const st = sky.state;
   const night = 1 - smoothstep(-6, 4, sky.elevation);
   shared.uSun.value = Math.min(1.2, st.sunI / 3);
@@ -279,7 +321,7 @@ function loop() {
   ui && ui.setUnderwater(under);
   fogDay.copy(st.fog);
   scene.fog.color.copy(under ? fogWater : fogDay);
-  scene.fog.density = under ? 0.075 : 0.0014 + night * 0.002;
+  scene.fog.density = under ? 0.075 : 0.0014 + night * 0.002 + weather.rain * 0.006;
 
   const wu = waterUniforms;
   wu.uSunDir.value.copy(sky.dir);
@@ -289,6 +331,13 @@ function loop() {
   wu.uFogColor.value.copy(scene.fog.color);
   wu.uFogDensity.value = scene.fog.density;
   wu.uAmbient.value = 0.35 + 0.65 * (1 - night);
+  wu.uRain.value = weather.rain;
+  wu.uGlow.value = smoothstep(0.5, 0.95, night);
+  if (started) {
+    wu.uPlayer.value.copy(player.pos);
+    const churn = player.kayak ? Math.abs(player.boatSpeed) / 3 : player.swimming ? Math.hypot(player.vel.x, player.vel.z) / 1.5 + 0.55 : 0;
+    wu.uStir.value = THREE.MathUtils.damp(wu.uStir.value, Math.min(1, churn), 4, dt);
+  }
   for (const m of water.children) {
     // Each mesh has its own uniform object for uOuter; the rest are shared references.
     m.material.uniforms.uFogDensity.value = scene.fog.density;
@@ -307,6 +356,8 @@ function loop() {
       barDist: Math.hypot(p.x - L.bar.x, p.z - L.bar.z),
       wind: Math.min(1, Math.max(0, (p.y - 3) / 18)),
       hour,
+      rain: weather.rain,
+      underRoof: world.underRoof(p.x, p.z),
     });
   }
 
@@ -357,7 +408,8 @@ function setupExtras(extras) {
 }
 function updateExtras(dt, t, hour) {
   for (const { h, cfg } of extraList) {
-    const on = hour >= cfg.hours[0] && hour < cfg.hours[1];
+    // Beachgoers head indoors when it rains.
+    const on = hour >= cfg.hours[0] && hour < cfg.hours[1] && weather.rain < 0.3;
     h.group.visible = on;
     if (!on) continue;
     const evening = cfg.night && hour >= 19;

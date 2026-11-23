@@ -87,6 +87,30 @@ export class Audio {
     deep.connect(deepF).connect(this.deepGain).connect(this.master);
     deep.start();
 
+    // Rain: bright noise, plus a duller drumming layer for roofs.
+    const rain = noise(4, false);
+    const rainHi = ctx.createBiquadFilter();
+    rainHi.type = 'highpass';
+    rainHi.frequency.value = 1400;
+    const rainLo = ctx.createBiquadFilter();
+    rainLo.type = 'lowpass';
+    rainLo.frequency.value = 9000;
+    this.rainGain = ctx.createGain();
+    this.rainGain.gain.value = 0;
+    rain.connect(rainHi).connect(rainLo).connect(this.rainGain).connect(this.underFilter);
+    rain.start();
+    const roof = noise(3, true);
+    const roofF = ctx.createBiquadFilter();
+    roofF.type = 'bandpass';
+    roofF.frequency.value = 700;
+    roofF.Q.value = 0.8;
+    this.roofGain = ctx.createGain();
+    this.roofGain.gain.value = 0;
+    roof.connect(roofF).connect(this.roofGain).connect(this.underFilter);
+    roof.start();
+    this.nextThunder = ctx.currentTime + 8;
+    this.noiseBuf = noise;
+
     // Bar music bus.
     this.musicGain = ctx.createGain();
     this.musicGain.gain.value = 0;
@@ -134,7 +158,24 @@ export class Audio {
     this.tone(freq * 3.03, 0.25, { vol: 0.03, dest: d, at });
   }
 
-  update(dt, { shore, underwater, night, barDist, wind, hour }) {
+  thunder() {
+    const ctx = this.ctx;
+    const src = this.noiseBuf(4, true);
+    src.loop = false;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 160;
+    const g = ctx.createGain();
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.7, t + 0.4);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 3.8);
+    src.connect(f).connect(g).connect(this.underFilter);
+    src.start(t);
+    src.stop(t + 4);
+  }
+
+  update(dt, { shore, underwater, night, barDist, wind, hour, rain = 0, underRoof = false }) {
     if (!this.ctx) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
@@ -147,6 +188,12 @@ export class Audio {
     this.windGain.gain.value += ((underwater ? 0 : 0.015 + wind * 0.035) - this.windGain.gain.value) * k;
     this.windF.frequency.value = 400 + Math.sin(now * 0.2) * 150;
     this.deepGain.gain.value += ((underwater ? 0.5 : 0) - this.deepGain.gain.value) * k;
+    this.rainGain.gain.value += ((underwater ? 0 : rain * (underRoof ? 0.08 : 0.16)) - this.rainGain.gain.value) * k;
+    this.roofGain.gain.value += ((underRoof && !underwater ? rain * 0.35 : 0) - this.roofGain.gain.value) * k;
+    if (rain > 0.7 && now > this.nextThunder) {
+      this.nextThunder = now + 14 + Math.random() * 20;
+      this.thunder();
+    }
     this.underFilter.frequency.value = underwater ? 600 : 20000;
 
     // Steel pan loop from The Salty Coconut.
@@ -169,7 +216,7 @@ export class Audio {
     }
 
     // Birds by day, crickets by night.
-    if (!underwater && !night && now > this.nextBird) {
+    if (!underwater && !night && rain < 0.3 && now > this.nextBird) {
       this.nextBird = now + 2 + Math.random() * 6;
       const base = 1800 + Math.random() * 1600;
       const n = 2 + Math.floor(Math.random() * 4);

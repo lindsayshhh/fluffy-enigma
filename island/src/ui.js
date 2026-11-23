@@ -201,7 +201,7 @@ export class UI {
     m.className = 'show volley';
     m.innerHTML = `
       <h2>Beach Volleyball vs. Nana Pearl</h2>
-      <p class="sub">Press <kbd>Space</kbd> (or click) when the ball is in the gold zone. Two clean hits in a rally wins the point. First to 3.</p>
+      <p class="sub">Press <kbd>Space</kbd> (or tap) when the ball is in the gold zone. Two clean hits in a rally wins the point. First to 3.</p>
       <div class="score"><span>You <b id="vy">0</b></span><span>Pearl <b id="vp">0</b></span></div>
       <div class="track"><div class="zone"></div><div class="ball"></div></div>
       <div class="call">Pearl serves...</div>`;
@@ -389,7 +389,7 @@ export class UI {
     m.className = 'show yoga';
     m.innerHTML = `
       <h2>Sunset Yoga with Marisol</h2>
-      <p class="sub">Keep your balance centered. Use <kbd>A</kbd>/<kbd>D</kbd>, the arrow keys, or move the mouse.</p>
+      <p class="sub">Keep your balance centered. Use <kbd>A</kbd>/<kbd>D</kbd>, the arrow keys, move the mouse, or drag a finger sideways.</p>
       <div class="pose"></div>
       <div class="track"><div class="zone"></div><div class="needle"></div></div>
       <div class="timer"><i></i></div>
@@ -421,6 +421,16 @@ export class UI {
       push += e.movementX * 0.004;
     };
     document.addEventListener('mousemove', onMove);
+    // Touch: drag sideways to shift your weight.
+    let lastTouchX = null;
+    const onTouch = (e) => {
+      const x = e.touches[0] ? e.touches[0].clientX : null;
+      if (x !== null && lastTouchX !== null) push += (x - lastTouchX) * 0.006;
+      lastTouchX = x;
+    };
+    const onTouchEnd = () => (lastTouchX = null);
+    document.addEventListener('touchmove', onTouch, { passive: true });
+    document.addEventListener('touchend', onTouchEnd);
     this.keyHandler = (e) => keys.add(e.code);
     const up = (e) => keys.delete(e.code);
     addEventListener('keyup', up);
@@ -451,6 +461,8 @@ export class UI {
         v = 0;
         if (p >= poses.length) {
           document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('touchmove', onTouch);
+          document.removeEventListener('touchend', onTouchEnd);
           removeEventListener('keyup', up);
           m.className = '';
           this.keyHandler = null;

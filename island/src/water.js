@@ -27,6 +27,10 @@ export const waterUniforms = {
   uWorld: { value: WORLD_SIZE },
   uOuter: { value: 0 },
   uAmbient: { value: 1 },
+  uRain: { value: 0 }, // rain dimpling the surface
+  uGlow: { value: 0 }, // bioluminescent plankton (nights)
+  uStir: { value: 0 }, // how much the player is churning the water
+  uPlayer: { value: new THREE.Vector3() },
 };
 
 export function waveHeight(x, z, t) {
@@ -115,6 +119,8 @@ uniform vec3 uFogColor;
 uniform float uFogDensity;
 uniform float uOuter;
 uniform float uAmbient;
+uniform float uRain, uGlow, uStir;
+uniform vec3 uPlayer;
 varying vec3 vWPos;
 varying float vDepth;
 
@@ -134,6 +140,8 @@ void main() {
   vec3 w = waves(vWPos.xz, damp, 4);
   vec2 det = ripple(vWPos.xz * 0.9 + vec2(uTime * 0.35, uTime * 0.2)) * 0.06
            + ripple(vWPos.xz * 2.3 - vec2(uTime * 0.25, -uTime * 0.31)) * 0.035;
+  det += (ripple(vWPos.xz * 7.0 + vec2(uTime * 1.7, -uTime * 2.3)) * 0.06
+        + ripple(vWPos.xz * 15.0 - uTime * 3.1) * 0.04) * uRain;
   vec3 N = normalize(vec3(-w.y - det.x, 1.0, -w.z - det.y));
 
   vec3 toCam = cameraPosition - vWPos;
@@ -183,6 +191,15 @@ void main() {
     // Light glows through the thin lip of a cresting wave.
     col += vec3(0.04, 0.22, 0.2) * br.x * sunUp * light;
     col = mix(col, vec3(0.92) * light * uAmbient, foam * 0.85);
+    // Plankton light up blue where the water is disturbed, on dark nights.
+    if (uGlow > 0.01) {
+      // Fine, twinkling specks rather than a wash of light.
+      float spark = pow(vn(vWPos.xz * 9.0 + uTime * 0.9), 7.0) * 3.0 + pow(vn(vWPos.xz * 23.0 - uTime * 1.7), 12.0) * 6.0;
+      float wake = smoothstep(3.5, 0.3, distance(vWPos.xz, uPlayer.xz)) * uStir;
+      float g = (br.y * 0.9 + br.z * 0.5 + wake) * spark * uGlow;
+      col += vec3(0.1, 0.75, 1.0) * g * 1.3;
+      alpha = max(alpha, min(1.0, g));
+    }
     alpha = max(alpha, foam * 0.9);
   } else {
     // Seen from below: the bright, wobbly ceiling of the sea.

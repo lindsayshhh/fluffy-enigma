@@ -10,23 +10,25 @@
   "imports": {
     "three": "./vendor/three.module.js",
     "three/addons/": "./vendor/addons/",
-    "./src/assets.js": "./src/assets.js?v=7",
-    "./src/audio.js": "./src/audio.js?v=7",
-    "./src/dialogue.js": "./src/dialogue.js?v=7",
-    "./src/game.js": "./src/game.js?v=7",
-    "./src/humans.js": "./src/humans.js?v=7",
-    "./src/layout.js": "./src/layout.js?v=7",
-    "./src/main.js": "./src/main.js?v=7",
-    "./src/noise.js": "./src/noise.js?v=7",
-    "./src/people.js": "./src/people.js?v=7",
-    "./src/player.js": "./src/player.js?v=7",
-    "./src/post.js": "./src/post.js?v=7",
-    "./src/props.js": "./src/props.js?v=7",
-    "./src/sky.js": "./src/sky.js?v=7",
-    "./src/terrain.js": "./src/terrain.js?v=7",
-    "./src/textures.js": "./src/textures.js?v=7",
-    "./src/ui.js": "./src/ui.js?v=7",
-    "./src/water.js": "./src/water.js?v=7"
+    "./src/assets.js": "./src/assets.js?v=8",
+    "./src/audio.js": "./src/audio.js?v=8",
+    "./src/dialogue.js": "./src/dialogue.js?v=8",
+    "./src/game.js": "./src/game.js?v=8",
+    "./src/humans.js": "./src/humans.js?v=8",
+    "./src/layout.js": "./src/layout.js?v=8",
+    "./src/main.js": "./src/main.js?v=8",
+    "./src/noise.js": "./src/noise.js?v=8",
+    "./src/people.js": "./src/people.js?v=8",
+    "./src/player.js": "./src/player.js?v=8",
+    "./src/post.js": "./src/post.js?v=8",
+    "./src/props.js": "./src/props.js?v=8",
+    "./src/sky.js": "./src/sky.js?v=8",
+    "./src/terrain.js": "./src/terrain.js?v=8",
+    "./src/textures.js": "./src/textures.js?v=8",
+    "./src/touch.js": "./src/touch.js?v=8",
+    "./src/ui.js": "./src/ui.js?v=8",
+    "./src/water.js": "./src/water.js?v=8",
+    "./src/weather.js": "./src/weather.js?v=8"
   }
 }
     </script>
@@ -45,6 +47,7 @@
       <div class="row"><span>Vacation bliss <b id="bliss">0</b></span><span id="credits">$200</span></div>
       <div id="status"></div>
     </div>
+    <div id="rotate">Turn your device sideways for a better view</div>
     <div id="keys"><kbd>J</kbd> journal <kbd>Esc</kbd> pause</div>
 
     <div id="prompt"></div>
@@ -116,14 +119,18 @@
           <button id="start" disabled>Building the island…</button>
           <button id="continue" hidden>Continue vacation</button>
         </div>
-        <p class="controls">
+        <p class="controls touch-only">
+          Left thumb: move (push all the way to run) · Right thumb: drag to look · Tap the yellow button to talk and do things.
+          Best held sideways, with sound on.
+        </p>
+        <p class="controls mouse-only">
           <kbd>W A S D</kbd> walk · <kbd>Mouse</kbd> look · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump ·
           <kbd>C</kbd> dive · <kbd>E</kbd> interact · <kbd>J</kbd> journal · Best with sound on, on a computer.<br /><small>Photoscanned textures and models: Poly Haven (CC0) · Characters: Microsoft Rocketbox (MIT) · Palms and plants: Next Spring, evolveduk, MozzarellaARC on Sketchfab (CC BY 4.0)</small>
         </p>
-        <p class="build">Build 7</p>
+        <p class="build">Build 8</p>
       </div>
     </div>
 
-    <script type="module" src="src/main.js?v=7"></script>
+    <script type="module" src="src/main.js?v=8"></script>
   </body>
 </html>

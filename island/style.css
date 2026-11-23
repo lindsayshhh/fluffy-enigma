@@ -761,3 +761,220 @@ body.ui-free #crosshair {
   letter-spacing: 0.2em;
   min-height: 1.4em;
 }
+
+/* ------------------------------------------------------- touch screens */
+body.touch,
+body.touch canvas#c {
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+body.touch #keys,
+body.touch #prompt,
+body:not(.touch) .touch-only,
+body.touch .mouse-only {
+  display: none !important;
+}
+#touch.hidden .tb,
+#touch.hidden .joy {
+  display: none;
+}
+#touch .joy {
+  position: fixed;
+  width: 110px;
+  height: 110px;
+  margin: -55px 0 0 -55px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  background: rgba(18, 24, 32, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+#touch .joy.on {
+  opacity: 1;
+}
+#touch .knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+#touch .tb {
+  position: fixed;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(18, 24, 32, 0.55);
+  color: #fff;
+  font: 600 14px system-ui, sans-serif;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  touch-action: none;
+}
+#touch .jump {
+  right: calc(24px + env(safe-area-inset-right, 0px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 74px;
+  height: 74px;
+}
+#touch .dive {
+  right: calc(110px + env(safe-area-inset-right, 0px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 64px;
+  height: 64px;
+  display: none;
+}
+#touch .dive.show {
+  display: block;
+}
+#touch .act {
+  right: calc(24px + env(safe-area-inset-right, 0px));
+  bottom: calc(112px + env(safe-area-inset-bottom, 0px));
+  max-width: min(46vw, 320px);
+  min-height: 56px;
+  padding: 10px 20px;
+  background: var(--sun);
+  color: #3a2200;
+  font-size: 15px;
+  display: none;
+}
+#touch .act.show {
+  display: block;
+}
+#touch .small {
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  padding: 8px 14px;
+  font-size: 13px;
+}
+#touch .journal {
+  right: calc(70px + env(safe-area-inset-right, 0px));
+}
+#touch .pause {
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  width: 44px;
+}
+body.touch #toasts {
+  top: 56px;
+}
+#rotate {
+  display: none;
+}
+@media (orientation: portrait) {
+  body.touch #rotate {
+    display: block;
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: var(--glass);
+    font-size: 13px;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+}
+
+/* Short screens (phones held sideways): compact HUD and panels. */
+@media (max-height: 520px) {
+  #hud {
+    width: 200px;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+  #clock {
+    font-size: 17px;
+  }
+  .meter {
+    grid-template-columns: 64px 1fr 22px;
+    margin: 3px 0;
+  }
+  #dialogue {
+    max-height: 72vh;
+    overflow-y: auto;
+    padding: 12px 16px;
+    bottom: 10px;
+  }
+  #dialogue .text {
+    font-size: 15px;
+    margin: 6px 0 8px;
+  }
+  #dialogue .choices button {
+    padding: 7px 10px;
+    font-size: 14px;
+  }
+  #narration .card {
+    font-size: 17px;
+  }
+  #minigame {
+    padding: 14px 16px;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  #title .pitch {
+    font-size: 15px;
+  }
+  #title h1 {
+    font-size: 44px;
+  }
+}
+
+/* Phones held sideways: keep the HUD out of the way. */
+@media (max-height: 430px) {
+  #hud {
+    width: 168px;
+    padding: 6px 9px;
+    font-size: 10px;
+    border-radius: 10px;
+  }
+  #hud .when {
+    margin-bottom: 3px;
+  }
+  #clock {
+    font-size: 14px;
+  }
+  .meter {
+    grid-template-columns: 52px 1fr 18px;
+    gap: 5px;
+    margin: 1px 0;
+  }
+  .meter span {
+    height: 5px;
+  }
+  #hud .row {
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+  #bliss {
+    font-size: 12px;
+  }
+  #status {
+    margin-top: 3px;
+    gap: 4px;
+  }
+  #status span {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+  #touch .jump {
+    width: 62px;
+    height: 62px;
+  }
+  #touch .act {
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    min-height: 46px;
+    padding: 8px 16px;
+  }
+}
+@media (max-height: 430px) {
+  body:has(#dialogue.show) #hud,
+  body:has(#narration.show) #hud {
+    opacity: 0;
+  }
+}

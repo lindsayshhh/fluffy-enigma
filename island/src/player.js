@@ -49,6 +49,7 @@ export class Player {
   lock() {
     this.wantLock = true;
     this.enabled = true;
+    if (this.touchMode) return; // touch screens look by dragging instead
     if (!this.locked && this.dom.requestPointerLock) {
       try {
         const r = this.dom.requestPointerLock();
@@ -118,8 +119,9 @@ export class Player {
   updateKayak(dt, t) {
     const k = this.keys;
     const active = this.enabled;
-    const f = active ? (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0) : 0;
-    const turn = active ? (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0) - (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) : 0;
+    const tm = active && this.touchMove ? this.touchMove : { x: 0, y: 0 };
+    const f = active ? (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0) || Math.round(-tm.y * 10) / 10 : 0;
+    const turn = active ? (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0) - (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) || -tm.x : 0;
     this.boatSpeed = THREE.MathUtils.damp(this.boatSpeed, f > 0 ? 4.2 : f < 0 ? -1.6 : 0, f ? 1.4 : 0.6, dt);
     const dYaw = turn * dt * (0.5 + Math.min(1, Math.abs(this.boatSpeed) / 3) * 0.8);
     this.boatYaw += dYaw;
@@ -158,8 +160,15 @@ export class Player {
       if (k.has('ArrowLeft')) this.yaw += dt * 1.8;
       if (k.has('ArrowRight')) this.yaw -= dt * 1.8;
     }
-    const f = active ? (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0) : 0;
-    const s = active ? (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0) : 0;
+    let f = active ? (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0) : 0;
+    let s = active ? (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0) : 0;
+    // Touch joystick: pushing it all the way runs.
+    const tm = this.touchMove;
+    const touchRun = active && tm && Math.hypot(tm.x, tm.y) > 0.93;
+    if (active && tm && !f && !s && Math.hypot(tm.x, tm.y) > 0.08) {
+      f = -tm.y;
+      s = tm.x;
+    }
     const move = new THREE.Vector3(Math.sin(this.yaw) * -f + Math.cos(this.yaw) * s, 0, Math.cos(this.yaw) * -f - Math.sin(this.yaw) * s);
     if (move.lengthSq() > 1) move.normalize();
 
@@ -169,7 +178,7 @@ export class Player {
     this.swimming = depth > 1.35;
     const wading = !this.swimming && ground < surface - 0.25;
 
-    this.running = active && (k.has('ShiftLeft') || k.has('ShiftRight')) && !this.swimming && move.lengthSq() > 0 && this.tired !== true;
+    this.running = active && (k.has('ShiftLeft') || k.has('ShiftRight') || touchRun) && !this.swimming && move.lengthSq() > 0 && this.tired !== true;
     let speed = this.swimming ? 1.7 : wading ? 2.1 : this.running ? 6.2 : 3.3;
     if (this.tired) speed *= 0.7;
 
@@ -177,7 +186,7 @@ export class Player {
     this.vel.z = THREE.MathUtils.damp(this.vel.z, move.z * speed, this.swimming ? 2.5 : 10, dt);
 
     if (this.swimming) {
-      const wantDive = active && (k.has('KeyC') || k.has('ControlLeft'));
+      const wantDive = active && (k.has('KeyC') || k.has('ControlLeft') || this.touchDive);
       const maxDive = Math.max(0, surface - ground - 1.9);
       this.dive = THREE.MathUtils.damp(this.dive, wantDive ? Math.min(maxDive, 3.5) : 0, 2.2, dt);
       const targetY = surface - EYE + 0.18 - this.dive;
@@ -185,7 +194,7 @@ export class Player {
       this.vel.y = 0;
       this.onGround = false;
       // Climb out onto a dock or deck.
-      if (active && k.has('Space')) {
+      if (active && (k.has('Space') || this.touchJump)) {
         const p = this.world.platformNear(this.pos.x, this.pos.z, 0.9);
         if (p && p.y < 2.3) {
           const cx = p.r !== undefined ? p.x : THREE.MathUtils.clamp(this.pos.x, p.x0 + 0.5, p.x1 - 0.5);
@@ -200,7 +209,7 @@ export class Player {
       }
     } else {
       this.dive = 0;
-      if (this.onGround && active && k.has('Space')) {
+      if (this.onGround && active && (k.has('Space') || this.touchJump)) {
         this.vel.y = 5.2;
         this.onGround = false;
       }

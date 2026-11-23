@@ -45,6 +45,15 @@ Play it on a computer with a mouse and keyboard, with sound on.
 - **Fishing**: at the end of the dock, from 6 am to 8 pm. Strike with `Space` when the bobber dips. The sea gives up some odd things, and at least one of them belongs to somebody.
 - **The last night**: on day 3 there's a bonfire on the main beach from 7:30 pm. Everyone comes, and how their evening goes depends on what you did together.
 
+### Weather and nights
+
+- Tropical showers roll in a few times over the trip: the sky goes grey, the sand turns dark and glossy, and everyone runs for the bar. Late-afternoon showers leave a rainbow behind (rainbows need the sun below 42°, as in real life). The last evening is always clear.
+- On dark nights the sea is full of bioluminescent plankton that light up where you swim or paddle, and you can lie on the dock and watch for shooting stars.
+
+### Phones and tablets
+
+On a touch screen the game shows on-screen controls: a joystick wherever your left thumb lands (push it all the way to run, and it paddles the kayak too), drag with your right thumb to look, and a yellow button for whatever you can do right now. Jump, Dive (while swimming), Journal and Pause have their own buttons. Touch devices start on the Low graphics setting. Hold the device sideways.
+
 One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 
 ## The locals
@@ -68,6 +77,8 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 | `src/props.js` | Palms, grass, flowers, rocks, reef, fish, turtle and every building; collision and walkable surfaces |
 | `src/layout.js` | Where everything sits, derived from the real shoreline |
 | `src/humans.js` | Realistic Rocketbox characters: loading, animation blending, head tracking, lip movement and blinking, props |
+| `src/weather.js` | Showers, wet ground, rain sound cues, the overcast veil and rainbows |
+| `src/touch.js` | On-screen joystick, drag-to-look and buttons for touch screens |
 | `src/post.js` | Post-processing: ambient occlusion, bloom, depth of field in conversations, colour grade, vignette, film grain |
 | `src/people.js` | Fallback procedural characters, and Kevin |
 | `tools/` | Scripts that converted the Rocketbox textures and animations for the web |
