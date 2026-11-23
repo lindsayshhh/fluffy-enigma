@@ -234,8 +234,8 @@ function scannedLounger() {
         v += uv ? uv.getY(i + k) / 3 : 0;
       }
       const [r, gg, b] = colourAt(u, v);
-      // Cream cushion vs brown/tan wood.
-      const cushion = r > 205 && gg > 195 && b > 180;
+      // Cream cushion and tan pillow vs brown wood.
+      const cushion = r > 180 && gg > 150;
       const list = cushion ? tris.cushion : tris.frame;
       for (let k = 0; k < 3; k++) {
         const q = new THREE.Vector3(pos.getX(i + k), pos.getY(i + k), pos.getZ(i + k));
@@ -365,7 +365,7 @@ function scannedPlants() {
 
 const MAT = {};
 // Resort cushions: mostly natural canvas, a few in the island's colours.
-const LOUNGER_CUSHIONS = ['#f1ebdd', '#f1ebdd', '#2f8f93', '#f1ebdd', '#e3825f', '#f1ebdd', '#2f8f93'];
+const LOUNGER_CUSHIONS = ['#f1ebdd', '#f1ebdd', '#2f8f93', '#f1ebdd', '#d9967a', '#f1ebdd', '#2f8f93'];
 function initMaterials() {
   MAT.wood = new THREE.MeshStandardMaterial({ map: T.woodTexture([156, 112, 70], 6, 1, [1, 1]), roughness: 0.85 });
   MAT.deck = new THREE.MeshStandardMaterial({ map: T.woodTexture([165, 125, 85], 8, 2, [3, 3]), roughness: 0.8 });
