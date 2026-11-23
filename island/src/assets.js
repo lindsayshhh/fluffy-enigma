@@ -23,6 +23,44 @@ const SCENES = ['palms', 'coconut_palm', 'tropical_plants'];
 // `failed` lists anything that couldn't load, so the game can say so.
 export const assets = { tex: {}, models: {}, scenes: {}, failed: [] };
 
+// Load one of our glTF JSON files whose geometry is embedded as a base64
+// data: URI. Strict hosts (claude.ai artifacts) block fetching data: URIs,
+// which is what GLTFLoader would do, so decode the buffer here and hand the
+// loader an in-memory GLB instead. Textures still load from their files.
+async function loadEmbeddedGltf(loader, url) {
+  const doc = await fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+    return r.json();
+  });
+  const base = url.slice(0, url.lastIndexOf('/') + 1);
+  const buf = doc.buffers && doc.buffers[0];
+  if (!buf || !buf.uri || !buf.uri.startsWith('data:')) return loader.parseAsync(JSON.stringify(doc), base);
+  const raw = atob(buf.uri.slice(buf.uri.indexOf(',') + 1));
+  const bin = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bin[i] = raw.charCodeAt(i);
+  delete buf.uri;
+  // GLB container: 12-byte header, JSON chunk, BIN chunk (each 4-byte aligned).
+  let json = new TextEncoder().encode(JSON.stringify(doc));
+  const jsonPad = (4 - (json.length % 4)) % 4;
+  const binPad = (4 - (bin.length % 4)) % 4;
+  const total = 12 + 8 + json.length + jsonPad + 8 + bin.length + binPad;
+  const glb = new ArrayBuffer(total);
+  const dv = new DataView(glb);
+  const u8 = new Uint8Array(glb);
+  dv.setUint32(0, 0x46546c67, true); // 'glTF'
+  dv.setUint32(4, 2, true);
+  dv.setUint32(8, total, true);
+  dv.setUint32(12, json.length + jsonPad, true);
+  dv.setUint32(16, 0x4e4f534a, true); // 'JSON'
+  u8.set(json, 20);
+  u8.fill(0x20, 20 + json.length, 20 + json.length + jsonPad);
+  let off = 20 + json.length + jsonPad;
+  dv.setUint32(off, bin.length + binPad, true);
+  dv.setUint32(off + 4, 0x004e4942, true); // 'BIN\0'
+  u8.set(bin, off + 8);
+  return loader.parseAsync(glb, base);
+}
+
 export async function loadAssets(renderer, onProgress) {
   const texLoader = new THREE.TextureLoader();
   const gltfLoader = new GLTFLoader();
@@ -55,8 +93,7 @@ export async function loadAssets(renderer, onProgress) {
   });
 
   const modelJobs = MODELS.map((name) =>
-    gltfLoader
-      .loadAsync(`assets/models/${name}/${name}.json`) // glTF with its buffer embedded
+    loadEmbeddedGltf(gltfLoader, `assets/models/${name}/${name}.json`)
       .then((g) => {
         let mesh = null;
         g.scene.traverse((o) => {
@@ -77,8 +114,7 @@ export async function loadAssets(renderer, onProgress) {
   );
 
   const sceneJobs = SCENES.map((name) =>
-    gltfLoader
-      .loadAsync(`assets/sketchfab/${name}/${name}.json`)
+    loadEmbeddedGltf(gltfLoader, `assets/sketchfab/${name}/${name}.json`)
       .then((g) => {
         g.scene.updateMatrixWorld(true);
         assets.scenes[name] = g.scene;
