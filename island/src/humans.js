@@ -17,7 +17,7 @@ export const CASTING = {
   pearl: { avatar: 'Female_Adult_14', sex: 'f', idle: 'f_stretch', scale: 0.95, beachwear: true },
 };
 export const EXTRAS = [
-  { avatar: 'Sports_Female_01', sex: 'f', idle: 'f_calm' },
+  { avatar: 'Sports_Female_01', sex: 'f', idle: 'f_calm', key: 'skye', selfie: true },
   { avatar: 'Sports_Male_01', sex: 'm', idle: 'm_stretch' },
   { avatar: 'Female_Party_01', sex: 'f', idle: 'f_calm', evening: 'f_dance' },
 ];
@@ -189,6 +189,16 @@ function makeHat() {
   return g;
 }
 
+function makePhone() {
+  const phone = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.155, 0.009), new THREE.MeshStandardMaterial({ color: 0xe9c6cf, metalness: 0.3, roughness: 0.4 }));
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.066, 0.142), new THREE.MeshBasicMaterial({ color: 0x9fd3ff }));
+  screen.position.z = -0.0051;
+  screen.rotation.y = Math.PI;
+  phone.add(screen);
+  phone.castShadow = true;
+  return phone;
+}
+
 function makeLaptop() {
   const laptop = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, metalness: 0.7, roughness: 0.3 });
@@ -254,6 +264,11 @@ export class Human {
     if (role.laptop) {
       this.laptop = makeLaptop();
       this.group.add(this.laptop);
+    }
+    if (role.selfie) {
+      this.phone = makePhone();
+      this.phone.visible = false;
+      this.group.add(this.phone);
     }
   }
 
@@ -351,6 +366,19 @@ export class Human {
       this.group.worldToLocal(_v);
       this.hat.position.copy(_v).add(new THREE.Vector3(0, 0.13, 0.0));
       this.hat.rotation.set(-0.08, this.headYaw * 0.9, 0);
+    }
+    if (this.phone) {
+      // Held up at arm's length for a selfie while the photo pose plays.
+      const l = this.bones.Bip01_L_Hand;
+      const r = this.bones.Bip01_R_Hand;
+      const a = l && this.group.worldToLocal(l.getWorldPosition(new THREE.Vector3()));
+      const b = r && this.group.worldToLocal(r.getWorldPosition(new THREE.Vector3()));
+      const raised = state === 'photo' && a && b && Math.min(a.y, b.y) > 1.15 && a.distanceTo(b) < 0.5;
+      this.phone.visible = !!raised;
+      if (raised) {
+        this.phone.position.addVectors(a, b).multiplyScalar(0.5).add(new THREE.Vector3(0, 0.06, 0.03));
+        this.phone.rotation.set(-0.25, 0, 0);
+      }
     }
     if (this.laptop && this.laptop.visible) {
       const l = this.bones.Bip01_L_Hand;

@@ -597,6 +597,110 @@ export const CHARACTERS = {
     },
   },
 
+  // ---------------------------------------------------------------- SKYE
+  skye: {
+    name: 'Skye Marlowe',
+    title: 'Lifestyle creator (412 followers)',
+    color: '#c2407a',
+    start: (s) => (s.flags.metSkye ? 'hub' : 'intro'),
+    nodes: {
+      intro: {
+        text: "Oh my god, hi. Can you take my picture? Not a picture. Like, forty pictures. I'm Skye. Lifestyle creator. Four hundred and twelve followers, but they're very engaged.",
+        choices: [
+          { text: 'Sure. Forty pictures.', set: ['metSkye'], fx: { fun: 4, relax: -3 }, go: 'forty' },
+          { text: "I'll take one. One good one.", set: ['metSkye', 'skyeGoodPhoto'], fx: { fun: 8, relax: 2 }, go: 'one' },
+          { text: "Sorry, I'm on vacation from cameras.", set: ['metSkye'], fx: { relax: 3 }, go: 'nocam' },
+        ],
+      },
+      forty: {
+        text: "You take forty-one. She reviews each one with the face of a jeweller inspecting a fake diamond. 'Okay, number nineteen is giving... nothing. But it's giving it beautifully.'",
+        choices: [
+          { text: 'Want me to try one more? Properly?', set: ['skyeGoodPhoto'], fx: { fun: 4 }, go: 'one' },
+          { text: 'Glad I could help.', end: true },
+        ],
+      },
+      one: {
+        text: "You crouch, wait for a wave to curl up behind her, and take a single photo. She stares at it for a long time. 'Oh. That's... me? I look like I'm actually here.'",
+        choices: [{ text: 'You are actually here.', fx: { relax: 4 }, go: 'here' }],
+      },
+      here: {
+        text: "'Huh.' She looks up from the screen at the actual sea for about one and a half seconds. Then back at the screen. Progress.",
+        choices: [{ text: '(leave her to it)', end: true }],
+      },
+      nocam: {
+        text: "She looks at you like you said you're on vacation from oxygen. 'That's so brave. Can I film you saying that?'",
+        choices: [
+          { text: 'No.', fx: { fun: 3 }, end: true },
+          { text: "Fine. I'll take one picture of you. One.", set: ['skyeGoodPhoto'], fx: { fun: 6 }, go: 'one' },
+        ],
+      },
+      hub: {
+        text: (s, g) => {
+          if (s.flags.skyePhoneDown)
+            return pick(g, 'skyeOff', [
+              "No phone. I keep reaching for it like a phantom limb. But I saw a fish. A real one. It didn't even know I was there.",
+              "Do you know how long a wave takes when you're not filming it? Like four seconds. Every time. It's insane.",
+              "My followers think I've been kidnapped. I have been. By the beach.",
+            ]);
+          if (s.flags.skyeGoodPhoto && s.hour >= 17 && !s.flags.skyeSunset)
+            return "It's golden hour. You're the only person who's ever made me look like a person instead of a product. One more? Of both of us?";
+          return pick(g, 'skyeOn', [
+            "I posted your photo. Thirteen likes. One was my mom. Twice. She has two accounts.",
+            "Someone commented 'goals.' I don't know them. I've never felt so seen.",
+            "I'm doing a 'day in my life' but my life today is just standing here, so I'm doing it from more angles.",
+            "Is that seagull following me? He's been in the back of eleven shots. I think he wants to collab.",
+          ]);
+        },
+        choices: [
+          {
+            text: 'Take the golden-hour photo.',
+            if: (s) => s.flags.skyeGoodPhoto && s.hour >= 17 && !s.flags.skyeSunset,
+            set: ['skyeSunset'],
+            act: (g) => g.memory('skye_sunset', "Took a sunset photo with Skye. She didn't post it. 'This one's mine,' she said."),
+            fx: { fun: 10, relax: 8 },
+            go: 'sunset',
+          },
+          { text: 'Put the phone down for an hour. Come look at the water.', if: (s) => !s.flags.skyePhoneDown, go: 'convince' },
+          { text: 'How is the content going?', fx: { fun: 3 }, go: 'hubAgain' },
+          { text: 'Enjoy the beach, Skye.', end: true },
+        ],
+      },
+      hubAgain: {
+        text: (s, g) => pick(g, 'skyeTalk', [
+          "Honestly? I've been on this beach for six hours and I haven't touched the water. I've touched the water's hashtag.",
+          "A brand messaged me! It was a scam. But it was a scam that thought I was worth scamming.",
+          "My ring light died. I had to use the sun. The sun is SO harsh. Like, who lit this place?",
+        ]),
+        choices: [{ text: 'Mm.', go: 'hub' }],
+      },
+      convince: {
+        text: (s) =>
+          s.items.phone
+            ? "'Says the person whose pocket has buzzed four times since you walked up.' ...Fair."
+            : "'Wait. You don't have a phone? At all?' You shrug. She looks at her phone. She looks at the sea. 'Then what do you even DO all day?' You point at everything.",
+        choices: [
+          { text: '(touché)', if: (s) => s.items.phone, act: (g) => g.setFlag('hintBury'), end: true },
+          {
+            text: 'Come on.',
+            if: (s) => !s.items.phone,
+            set: ['skyePhoneDown'],
+            fx: { fun: 6, relax: 8 },
+            act: (g) => g.memory('skye_offline', 'Talked an influencer into putting her phone away. She looked at the sea like she had never seen it unfiltered.'),
+            go: 'offline',
+          },
+        ],
+      },
+      offline: {
+        text: "She turns the phone off. Not silent. Off. She holds it like a live grenade, then tucks it into her bag. 'If I start shaking, distract me.' You both watch a wave come in. Then another one. She doesn't film either.",
+        choices: [{ text: 'Nice, right?', end: true }],
+      },
+      sunset: {
+        text: "The sun slides into the sea behind you both. She takes it, looks at it once, and puts the phone away. 'I'm not posting this one,' she says. 'This one's mine.'",
+        choices: [{ text: 'Good.', end: true }],
+      },
+    },
+  },
+
   // --------------------------------------------------------------- PHONE
   phone: {
     name: 'Your Phone',

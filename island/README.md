@@ -64,6 +64,7 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 - **Gary Lindqvist** has been trying to send one email for four days.
 - **Marisol Vega-Sun** leads sunset yoga and will tell you about your aura whether you ask or not.
 - **Nana Pearl**, 84, plays beach volleyball and is undefeated since Tuesday.
+- **Skye Marlowe** is a lifestyle creator with 412 very engaged followers. She has been on the south beach for six hours and has not touched the water, only its hashtag.
 - **Kevin** is a seagull. Kevin wants your churro.
 
 ## Code layout

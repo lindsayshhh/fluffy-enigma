@@ -15,6 +15,7 @@ import { loadHumans, makeHumanCast } from './humans.js';
 import { Post } from './post.js';
 import { Weather } from './weather.js';
 import { TouchControls, isTouchDevice } from './touch.js';
+import { CHARACTERS } from './dialogue.js';
 
 const TOUCH = isTouchDevice();
 if (TOUCH) document.body.classList.add('touch');
@@ -158,6 +159,7 @@ async function build() {
     return g;
   };
   game = fresh();
+  addExtraInteractions(game);
   player.teleport(L.spawn.x, L.spawn.z, world.myHut.deckY, -0.7);
 
   // Debug hooks: ?hour=17.5 starts at a given time, ?at=bar teleports.
@@ -362,9 +364,10 @@ function loop() {
   }
 
   let dof = null;
-  if (started && game.talking && game.npcs[game.talking]) {
-    const n = game.npcs[game.talking].pos;
-    dof = camera.position.distanceTo(_head.set(n.x, n.y + 1.6, n.z));
+  if (started && game.talking) {
+    const ex = extraList.find((e) => e.h.role.key === game.talking);
+    const n = game.npcs[game.talking] ? game.npcs[game.talking].pos : ex && ex.h.group.position;
+    if (n) dof = camera.position.distanceTo(_head.set(n.x, n.y + 1.6, n.z));
   }
   if (post) {
     post.setSun(sky.dir, sky.elevation, st.sun, under);
@@ -389,7 +392,7 @@ function setupExtras(extras) {
   const spots = [
     () => {
       const l = L.loungers[1];
-      return { day: { x: l.x + 1.5, z: l.z + 4, face: 0 }, hours: [9, 18] };
+      return { day: { x: l.x + 1.5, z: l.z + 4, face: 0 }, hours: [9, 19.5] };
     },
     () => {
       const s = findShore(4, 0, 0, 1);
@@ -406,6 +409,25 @@ function setupExtras(extras) {
     return { h, cfg };
   });
 }
+// Beachgoers with something to say (only Skye, for now) become talkable.
+function addExtraInteractions(g) {
+  for (const e of extraList) {
+    const key = e.h.role.key;
+    if (!key || !CHARACTERS[key]) continue;
+    g.interactables.push({
+      kind: 'npc',
+      key,
+      r: 2.6,
+      get pos() {
+        return e.h.group.position;
+      },
+      visible: () => e.h.group.visible,
+      label: () => `Talk to ${CHARACTERS[key].name.split(' ')[0]}`,
+      act: () => g.openDialogue(key),
+    });
+  }
+}
+
 function updateExtras(dt, t, hour) {
   for (const { h, cfg } of extraList) {
     // Beachgoers head indoors when it rains.
@@ -415,9 +437,16 @@ function updateExtras(dt, t, hour) {
     const evening = cfg.night && hour >= 19;
     const spot = evening ? cfg.night : cfg.day;
     h.group.position.set(spot.x, world.groundAt(spot.x, spot.z), spot.z);
-    h.group.rotation.y = spot.face;
+    const talking = !!game && game.talking === h.role.key && !!h.role.key;
+    // Face whoever she's talking to; otherwise drift back to her own view.
+    const want = talking ? Math.atan2(player.pos.x - spot.x, player.pos.z - spot.z) : spot.face;
+    let dy = want - h.group.rotation.y;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    h.group.rotation.y += dy * Math.min(1, dt * (talking ? 5 : 1.5));
     h.pose = evening && h.role.evening ? 'dance' : null;
+    // Skye takes selfies on and off, until someone talks her out of it.
+    if (h.role.selfie && !talking && !(game && game.s.flags.skyePhoneDown) && (t + 3) % 19 < 11) h.pose = 'laptop';
     const near = started && Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) < 7;
-    h.update(dt, t, { look: near ? player.pos : null });
+    h.update(dt, t, { look: near ? player.pos : null, talking, speaking: talking && ui.typing });
   }
 }
