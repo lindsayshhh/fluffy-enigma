@@ -43,7 +43,11 @@ function metreUVsCyl(geo, r, h) {
 // Materials
 
 function swayMaterial(params, amp) {
-  const m = new THREE.MeshStandardMaterial(params);
+  return addSway(new THREE.MeshStandardMaterial(params), amp);
+}
+
+// Wind sway in the vertex shader, weighted per vertex by an aSway attribute.
+function addSway(m, amp) {
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = shared.uTime;
     sh.vertexShader = sh.vertexShader
@@ -64,6 +68,148 @@ transformed += vec3(sin(uTime * 1.5 + ph + transformed.y * 0.3),
       );
   };
   return m;
+}
+
+// ---------------------------------------------------------------------------
+// Scanned vegetation (Sketchfab, CC BY)
+
+// Meshes of a loaded scene, grouped by key (null key = skip), with their
+// scene transforms baked into the geometry.
+function groupMeshes(scene, keyFn) {
+  const groups = new Map();
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const key = keyFn(o.name);
+    if (!key) return;
+    const geometry = o.geometry.clone().applyMatrix4(o.matrixWorld);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ geometry, material: o.material, name: o.name });
+  });
+  return groups;
+}
+
+const swayCache = new Map();
+function swayClone(material, amp) {
+  const key = material.uuid + amp;
+  if (!swayCache.has(key)) {
+    const m = material.clone();
+    m.side = THREE.DoubleSide;
+    if (m.alphaTest === 0 && m.transparent) {
+      m.transparent = false;
+      m.alphaTest = 0.5;
+    }
+    swayCache.set(key, addSway(m, amp));
+  }
+  return swayCache.get(key);
+}
+
+// Normalise a scanned tree or plant: base at the origin, `height` metres tall,
+// and (unless keepLean) its crown leaning toward +x so placement can aim it.
+// Leaf parts get an aSway weight: by distance from the trunk ('crown') or by
+// height ('height').
+function prepareVegetation(parts, { isLeaf, height, keepLean = false, swayBy = 'crown', amp = 0.2 }) {
+  const box = new THREE.Box3();
+  for (const p of parts) {
+    p.geometry.computeBoundingBox();
+    box.union(p.geometry.boundingBox);
+  }
+  const minY = box.min.y;
+  const tall = Math.max(1e-3, box.max.y - minY);
+  const base = new THREE.Vector3();
+  let n = 0;
+  for (const p of parts) {
+    if (isLeaf(p)) continue;
+    const pos = p.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      if (pos.getY(i) < minY + tall * 0.04) {
+        base.x += pos.getX(i);
+        base.z += pos.getZ(i);
+        n++;
+      }
+    }
+  }
+  if (n) base.multiplyScalar(1 / n);
+  else box.getCenter(base);
+  const leafBox = new THREE.Box3();
+  for (const p of parts) if (isLeaf(p)) leafBox.union(p.geometry.boundingBox);
+  if (leafBox.isEmpty()) leafBox.copy(box);
+  const crown = leafBox.getCenter(new THREE.Vector3());
+  const ang = keepLean ? 0 : Math.atan2(crown.z - base.z, crown.x - base.x);
+  const k = height / tall;
+  const crownLocal = new THREE.Vector3(crown.x - base.x, crown.y - minY, crown.z - base.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), ang).multiplyScalar(k);
+  const leafRadius = Math.max(0.3, Math.max(leafBox.max.x - leafBox.min.x, leafBox.max.z - leafBox.min.z) * 0.5 * k);
+  for (const p of parts) {
+    const g = p.geometry;
+    g.translate(-base.x, -minY, -base.z);
+    g.rotateY(ang);
+    g.scale(k, k, k);
+    g.computeBoundingSphere();
+    if (isLeaf(p)) {
+      const pos = g.attributes.position;
+      const w = new Float32Array(pos.count);
+      for (let i = 0; i < pos.count; i++) {
+        const t = swayBy === 'height' ? pos.getY(i) / height : Math.hypot(pos.getX(i) - crownLocal.x, pos.getZ(i) - crownLocal.z) / leafRadius;
+        w[i] = Math.min(1, Math.max(0, t)) ** 1.4;
+      }
+      g.setAttribute('aSway', new THREE.BufferAttribute(w, 1));
+      p.mat = swayClone(p.material, amp);
+    } else {
+      p.mat = p.material;
+    }
+  }
+  return { parts, crown: crownLocal, height, leanRatio: Math.hypot(crownLocal.x, crownLocal.z) / height };
+}
+
+function scannedPalms() {
+  const scene = assets.scenes.palms;
+  if (!scene) return null;
+  const groups = groupMeshes(scene, (name) => {
+    const m = /Palm_P2_(\d+)_(Trunk|Leaf|Break)/.exec(name);
+    return m ? m[1] : null;
+  });
+  const isLeaf = (p) => /Leaf/.test(p.name);
+  const natural = [];
+  for (const parts of groups.values()) {
+    const b = new THREE.Box3();
+    parts.forEach((p) => b.union(new THREE.Box3().setFromBufferAttribute(p.geometry.attributes.position)));
+    natural.push(b.max.y - b.min.y);
+  }
+  const sorted = [...natural].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  return [...groups.values()].map((parts, i) =>
+    prepareVegetation(parts, { isLeaf, height: THREE.MathUtils.clamp((natural[i] * 9.5) / median, 7, 12.5), amp: 0.22 })
+  );
+}
+
+function scannedCoconutPalm() {
+  const scene = assets.scenes.coconut_palm;
+  if (!scene) return null;
+  const parts = groupMeshes(scene, () => 'tree').get('tree');
+  if (!parts) return null;
+  return prepareVegetation(parts, { isLeaf: (p) => p.material.alphaTest > 0 || p.material.transparent, height: 7.5, keepLean: true, amp: 0.18 });
+}
+
+function scannedPlants() {
+  const scene = assets.scenes.tropical_plants;
+  if (!scene) return null;
+  const groups = groupMeshes(scene, (name) => {
+    const m = /SM_MZRa_(Banana|Monstera|Palm|Fern)_(B\d+)/.exec(name);
+    if (!m) return null;
+    // The big fern variants are 3-10k triangles each; keep the light ones.
+    if (m[1] === 'Fern' && m[2].length < 5) return null;
+    return `${m[1]}_${m[2]}`;
+  });
+  const heights = { Banana: 3.0, Monstera: 1.5, Palm: 2.6, Fern: 0.8 };
+  const weights = { Banana: 3, Monstera: 4, Palm: 2, Fern: 2 };
+  const out = [];
+  for (const [key, parts] of groups) {
+    const kind = key.split('_')[0];
+    const v = prepareVegetation(parts, { isLeaf: () => true, height: heights[kind], keepLean: true, swayBy: 'height', amp: kind === 'Fern' ? 0.05 : 0.12 });
+    v.kind = kind;
+    v.weight = weights[kind];
+    out.push(v);
+  }
+  return out.length ? out : null;
 }
 
 const MAT = {};
@@ -397,13 +543,32 @@ export class World {
   // ---------------------------------------------------------------- palms
   buildPalms() {
     const r = rng(1234);
-    const variants = [
+    let variants = [
       { H: 7.5, lean: 1.4 },
       { H: 9, lean: 2.6 },
       { H: 10.5, lean: 3.6 },
       { H: 8.2, lean: 0.6 },
       { H: 6.2, lean: 2.2, droopy: true },
     ].map((v, i) => ({ ...v, geo: palmGeometry(v.H, v.lean, 77 + i * 13, v.droopy), list: [] }));
+    // Indices: which variants suit the beach (leaning), and the grove (coconuts).
+    let beachVariants = [2, 2, 2, 1, 1];
+    let groveVariants = [3, 4];
+    let anyVariants = [0, 1, 2, 3, 4];
+
+    const scanned = scannedPalms();
+    if (scanned) {
+      variants = scanned.map((v) => ({ ...v, list: [] }));
+      const byLean = variants.map((v, i) => i).sort((a, b) => variants[b].leanRatio - variants[a].leanRatio);
+      beachVariants = byLean.slice(0, Math.ceil(byLean.length * 0.6));
+      anyVariants = byLean;
+      groveVariants = byLean.slice(-4);
+      const coco = scannedCoconutPalm();
+      if (coco) {
+        variants.push({ ...coco, list: [] });
+        groveVariants = [variants.length - 1];
+      }
+    }
+    const pick = (arr) => arr[Math.floor(r() * arr.length)];
 
     const placed = [];
     const tryPlace = (x, z, opts = {}) => {
@@ -420,7 +585,7 @@ export class World {
       const c = Math.cos(wob);
       const s = Math.sin(wob);
       [lx, lz] = [lx * c - lz * s, lx * s + lz * c];
-      const vi = opts.variant ?? (beachy > 0.5 ? (r() < 0.6 ? 2 : 1) : Math.floor(r() * variants.length));
+      const vi = opts.grove ? pick(groveVariants) : beachy > 0.5 ? pick(beachVariants) : pick(anyVariants);
       const scale = 0.85 + r() * 0.3;
       placed.push({ x, z });
       variants[vi].list.push({ x, z, y: h, dir: Math.atan2(-lz, lx), scale, coconuts: !!opts.coconuts || r() < 0.3, grove: !!opts.coconuts });
@@ -428,10 +593,10 @@ export class World {
     };
 
     // Grove (coconut palms, shorter, reachable).
-    for (let i = 0; i < 400 && variants[4].list.length + variants[3].list.length < 16; i++) {
+    for (let i = 0, n = 0; i < 400 && n < 16; i++) {
       const a = r() * Math.PI * 2;
       const d = Math.sqrt(r()) * this.L.grove.r;
-      tryPlace(this.L.grove.x + Math.cos(a) * d, this.L.grove.z + Math.sin(a) * d, { coconuts: true, variant: r() < 0.5 ? 4 : 3, spacing: 4.5 });
+      if (tryPlace(this.L.grove.x + Math.cos(a) * d, this.L.grove.z + Math.sin(a) * d, { coconuts: true, grove: true, spacing: 4.5 })) n++;
     }
     // Beach fringe: a ring of leaning palms just above the sand.
     for (let i = 0, n = 0; i < 700 && n < 95; i++) {
@@ -451,6 +616,26 @@ export class World {
     for (const v of variants) {
       const n = v.list.length;
       if (!n) continue;
+      if (v.parts) {
+        // Scanned palm: one instanced mesh per part (trunk, fronds, ...).
+        const meshes = v.parts.map((p) => new THREE.InstancedMesh(p.geometry, p.mat, n));
+        v.list.forEach((p, i) => {
+          q.setFromAxisAngle(yAxis, p.dir);
+          m4.compose(new THREE.Vector3(p.x, p.y - 0.1, p.z), q, new THREE.Vector3(p.scale, p.scale, p.scale));
+          meshes.forEach((m) => m.setMatrixAt(i, m4));
+          const crown = v.crown.clone().multiplyScalar(p.scale).applyQuaternion(q);
+          this.shade.push({ x: p.x + crown.x, z: p.z + crown.z, r: 3.4 * p.scale });
+          this.colliders.push({ x: p.x, z: p.z, r: 0.38 });
+          if (p.grove) this.coconutPalms.push({ x: p.x, z: p.z, y: p.y, top: p.y + crown.y, cx: p.x + crown.x, cz: p.z + crown.z, nuts: 3 });
+        });
+        for (const m of meshes) {
+          m.castShadow = true;
+          m.receiveShadow = true;
+          m.frustumCulled = false;
+          this.scene.add(m);
+        }
+        continue;
+      }
       const trunk = new THREE.InstancedMesh(v.geo.trunk, MAT.trunk, n);
       const fronds = new THREE.InstancedMesh(v.geo.fronds, MAT.frond, n);
       const nutsList = v.list.filter((p) => p.coconuts);
@@ -522,6 +707,48 @@ export class World {
       if (pathDistance(x, z, this.L.paths) < 2.5) continue;
       bushes.push({ x, z, y: h - 0.1, s: 0.8 + r() * 0.8, a: r() * 6.28 });
     }
+
+    // Scanned tropical plants (banana, monstera, small palms, ferns) take the
+    // bushes' places when available, with a few extra around the island.
+    const plants = scannedPlants();
+    if (plants) {
+      for (let i = 0; i < 2000 && bushes.length < 150; i++) {
+        const x = (r() - 0.5) * 300;
+        const z = (r() - 0.5) * 220;
+        const h = height(x, z);
+        if (h < 2.6 || h > 16 || slope(x, z) > 0.5) continue;
+        if (this.excluded(x, z, 1)) continue;
+        if (pathDistance(x, z, this.L.paths) < 2.2) continue;
+        bushes.push({ x, z, y: h - 0.1, s: 0.8 + r() * 0.8, a: r() * 6.28 });
+      }
+      const total = plants.reduce((t, v) => t + v.weight, 0);
+      const lists = plants.map(() => []);
+      for (const b of bushes) {
+        let w = r() * total;
+        let vi = 0;
+        while (w > plants[vi].weight && vi < plants.length - 1) w -= plants[vi++].weight;
+        lists[vi].push({ ...b, s: 0.75 + r() * 0.5 });
+      }
+      plants.forEach((v, vi) => {
+        const list = lists[vi];
+        if (!list.length) return;
+        const meshes = v.parts.map((p) => new THREE.InstancedMesh(p.geometry, p.mat, list.length));
+        list.forEach((b, i) => {
+          q.setFromAxisAngle(yA, b.a);
+          m4.compose(new THREE.Vector3(b.x, b.y, b.z), q, new THREE.Vector3(b.s, b.s, b.s));
+          meshes.forEach((m) => m.setMatrixAt(i, m4));
+          if (v.kind !== 'Fern') this.colliders.push({ x: b.x, z: b.z, r: (v.kind === 'Monstera' ? 0.6 : 0.35) * b.s });
+        });
+        for (const m of meshes) {
+          m.castShadow = v.kind !== 'Fern';
+          m.receiveShadow = true;
+          m.frustumCulled = false;
+          this.scene.add(m);
+        }
+      });
+      return;
+    }
+
     const bm = new THREE.InstancedMesh(bushGeo, MAT.bush, bushes.length);
     const flowers = [];
     bushes.forEach((b, i) => {
@@ -570,7 +797,8 @@ export class World {
       if (this.excluded(x, z, 3)) continue;
       if (r() > (east ? 0.5 : 0.12)) continue;
       const s = east ? 0.6 + r() * 2.2 : 0.3 + r() * 1.0;
-      lists[i % 3].push({ x, z, y: h - s * 0.2, s, a: r() * 6.28, t: r() });
+      // Detailed scans only for the big boulders; small rocks stay simple.
+      lists[s > 2.1 ? i % 2 : 2].push({ x, z, y: h - s * 0.2, s, a: r() * 6.28, t: r() });
     }
     const m4 = new THREE.Matrix4();
     const q = new THREE.Quaternion();

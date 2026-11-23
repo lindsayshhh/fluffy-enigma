@@ -16,14 +16,17 @@ const TEXTURES = [
   'weathered_planks',
 ];
 const MODELS = ['lambis_shell', 'bar_chair_round_01', 'rock_07', 'rock_09'];
+// Whole scenes from Sketchfab (CC BY; see assets/CREDITS.md), kept intact so
+// props.js can split them into individual trees and plants.
+const SCENES = ['palms', 'coconut_palm', 'tropical_plants'];
 
-export const assets = { tex: {}, models: {} };
+export const assets = { tex: {}, models: {}, scenes: {} };
 
 export async function loadAssets(renderer, onProgress) {
   const texLoader = new THREE.TextureLoader();
   const gltfLoader = new GLTFLoader();
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const total = TEXTURES.length * 3 + MODELS.length;
+  const total = TEXTURES.length * 3 + MODELS.length + SCENES.length;
   let done = 0;
   const tick = () => onProgress && onProgress(++done / total);
 
@@ -70,7 +73,21 @@ export async function loadAssets(renderer, onProgress) {
       })
   );
 
-  await Promise.all([...texJobs, ...modelJobs]);
+  const sceneJobs = SCENES.map((name) =>
+    gltfLoader
+      .loadAsync(`assets/sketchfab/${name}/${name}.json`)
+      .then((g) => {
+        g.scene.updateMatrixWorld(true);
+        assets.scenes[name] = g.scene;
+        tick();
+      })
+      .catch((e) => {
+        console.warn('Scene failed, using procedural fallback:', name, e);
+        tick();
+      })
+  );
+
+  await Promise.all([...texJobs, ...modelJobs, ...sceneJobs]);
   return assets;
 }
 
