@@ -17,7 +17,7 @@ export const CASTING = {
   pearl: { avatar: 'Female_Adult_14', sex: 'f', idle: 'f_stretch', scale: 0.95, beachwear: true },
 };
 export const EXTRAS = [
-  { avatar: 'Sports_Female_01', sex: 'f', idle: 'f_idle' },
+  { avatar: 'Sports_Female_01', sex: 'f', idle: 'f_calm' },
   { avatar: 'Sports_Male_01', sex: 'm', idle: 'm_stretch' },
   { avatar: 'Female_Party_01', sex: 'f', idle: 'f_calm', evening: 'f_dance' },
 ];
@@ -28,6 +28,30 @@ function decodeBase64(s) {
   const out = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out.buffer;
+}
+
+// The motion-capture clips were cut from longer takes, so their last frame
+// doesn't match their first and the pose jumps each time a loop restarts
+// (a visible twitch up close). Ease the end of every track back into its
+// first key so the loops join up.
+const _qa = new THREE.Quaternion();
+const _qb = new THREE.Quaternion();
+function seamLoop(T, V, size, duration) {
+  const n = T.length;
+  if (n < 3) return;
+  const blend = Math.min(0.8, duration * (duration < 2 ? 0.15 : 0.3)); // gentler on walk cycles
+  const start = duration - blend;
+  for (let k = 1; k < n; k++) {
+    if (T[k] <= start) continue;
+    const w = THREE.MathUtils.smoothstep(T[k], start, duration);
+    if (size === 4) {
+      _qa.fromArray(V, k * 4);
+      _qb.fromArray(V, 0);
+      _qa.slerp(_qb, w).toArray(V, k * 4);
+    } else {
+      for (let j = 0; j < 3; j++) V[k * 3 + j] += (V[j] - V[k * 3 + j]) * w;
+    }
+  }
 }
 
 async function loadClips() {
@@ -41,6 +65,18 @@ async function loadClips() {
       const raw = new Int16Array(bin, t.offset + t.keys * 2, t.keys * size);
       const T = Float32Array.from(times, (v) => v / 1000);
       const V = Float32Array.from(raw, (v) => v / t.scale);
+      if (size === 4) {
+        // Quantisation leaves the rotations slightly off unit length, which
+        // shrinks and skews bones a little; renormalise them.
+        for (let k = 0; k < V.length; k += 4) {
+          const l = Math.hypot(V[k], V[k + 1], V[k + 2], V[k + 3]) || 1;
+          V[k] /= l;
+          V[k + 1] /= l;
+          V[k + 2] /= l;
+          V[k + 3] /= l;
+        }
+      }
+      seamLoop(T, V, size, c.duration);
       return t.type === 'q' ? new THREE.QuaternionKeyframeTrack(t.name, T, V) : new THREE.VectorKeyframeTrack(t.name, T, V);
     });
     clips[c.name] = new THREE.AnimationClip(c.name, c.duration, tracks);

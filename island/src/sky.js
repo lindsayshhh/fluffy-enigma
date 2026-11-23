@@ -223,6 +223,20 @@ export class SkySystem {
   // hour: 0-24 (fractional)
   // rain: 0..1 from the weather. Overcast skies dim the sun, grey the sky
   // and fog, and thicken the cloud deck.
+  snapShadowFocus(focus) {
+    const sc = this.sun.shadow.camera;
+    const texel = (sc.right - sc.left) / this.sun.shadow.mapSize.x;
+    const fwd = this.dir;
+    const right = (this._sr = this._sr || new THREE.Vector3()).crossVectors(fwd, new THREE.Vector3(0, 1, 0));
+    if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
+    right.normalize();
+    const up = (this._su = this._su || new THREE.Vector3()).crossVectors(right, fwd).normalize();
+    const r = Math.round(focus.dot(right) / texel) * texel;
+    const u = Math.round(focus.dot(up) / texel) * texel;
+    const f = focus.dot(fwd);
+    return (this._sf = this._sf || new THREE.Vector3()).copy(right).multiplyScalar(r).addScaledVector(up, u).addScaledVector(fwd, f);
+  }
+
   update(hour, focus, dt, rain = 0) {
     const dayT = (hour - 6.1) / 12.6; // 0 at sunrise, 1 at sunset
     const el = Math.sin(dayT * Math.PI) * 74 * (dayT >= 0 && dayT <= 1 ? 1 : 0.35);
@@ -249,8 +263,12 @@ export class SkySystem {
 
     this.sun.color.copy(s.sun);
     this.sun.intensity = s.sunI;
-    this.sun.position.copy(focus).addScaledVector(this.dir, 200);
-    this.sun.target.position.copy(focus);
+    // The shadow map follows the player. Move it only in whole shadow-map
+    // texels (in the light's own frame), otherwise its pixels slide across
+    // everything as you walk and shadows on people visibly crawl.
+    const sf = this.snapShadowFocus(focus);
+    this.sun.position.copy(sf).addScaledVector(this.dir, 200);
+    this.sun.target.position.copy(sf);
     this.sun.castShadow = el > -1;
 
     const night = 1 - smoothstep(-10, -2, el);
