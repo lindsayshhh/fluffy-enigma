@@ -203,7 +203,7 @@ async function build() {
     post = null;
   }
 
-  window.__palmera = { game, player, world, L, sky, post, weather };
+  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList };
   requestAnimationFrame(loop);
 }
 
@@ -417,7 +417,7 @@ function updateExtras(dt, t, hour) {
     h.group.position.set(spot.x, world.groundAt(spot.x, spot.z), spot.z);
     h.group.rotation.y = spot.face;
     h.pose = evening && h.role.evening ? 'dance' : null;
-    const near = started && Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) < 6;
+    const near = started && Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) < 7;
     h.update(dt, t, { look: near ? player.pos : null });
   }
 }

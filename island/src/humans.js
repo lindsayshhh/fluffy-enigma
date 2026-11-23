@@ -280,15 +280,20 @@ export class Human {
     this.mixer.update(dt);
 
     // Turn the head (and a little of the chest) toward whoever is nearby.
+    // People only follow you with their eyes while you're in front of them or
+    // off to one side. Once you're behind them they look ahead again, rather
+    // than whipping their head from one shoulder to the other as you pass.
     let target = 0;
     if (look && !moving) {
       const lx = look.x - this.group.position.x;
       const lz = look.z - this.group.position.z;
       let rel = Math.atan2(lx, lz) - this.group.rotation.y;
       rel = Math.atan2(Math.sin(rel), Math.cos(rel));
-      target = THREE.MathUtils.clamp(rel, -1.0, 1.0);
+      const facing = 1 - THREE.MathUtils.smoothstep(Math.abs(rel), 1.5, 2.2);
+      const near = 1 - THREE.MathUtils.smoothstep(Math.hypot(lx, lz), 4.5, 6.5);
+      target = THREE.MathUtils.clamp(rel, -1.0, 1.0) * facing * near;
     }
-    this.headYaw = THREE.MathUtils.damp(this.headYaw, target, 4, dt);
+    this.headYaw = THREE.MathUtils.damp(this.headYaw, target, 3, dt);
     addWorldYaw(this.bones.Bip01_Spine2, this.headYaw * 0.25);
     addWorldYaw(this.bones.Bip01_Neck, this.headYaw * 0.35);
     addWorldYaw(this.bones.Bip01_Head, this.headYaw * 0.4);

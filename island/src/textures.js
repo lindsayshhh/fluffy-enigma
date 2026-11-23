@@ -181,6 +181,43 @@ export function fabricTexture(colors) {
   return finish(c);
 }
 
+// Woven outdoor canvas: a white base (tinted by the material colour) with a
+// fine basket weave, plus a matching normal map so the weave catches light.
+export function canvasWeave() {
+  const N = 128;
+  const [c, g] = canvas(N, N);
+  const [cn, gn] = canvas(N, N);
+  const img = g.createImageData(N, N);
+  const nrm = gn.createImageData(N, N);
+  const r = rng(11);
+  const cell = 8;
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const cx = Math.floor(x / cell), cy = Math.floor(y / cell);
+      const warp = (cx + cy) % 2 === 0; // which thread is on top
+      const u = (x % cell) / cell, v = (y % cell) / cell;
+      const across = warp ? u : v;
+      const bump = Math.sin(across * Math.PI); // rounded thread
+      const shade = 0.86 + 0.1 * bump + (r() - 0.5) * 0.05;
+      const i = (y * N + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = Math.min(255, shade * 255);
+      img.data[i + 3] = 255;
+      const slope = Math.cos(across * Math.PI) * 0.45;
+      const nx = warp ? -slope : 0, ny = warp ? 0 : -slope;
+      nrm.data[i] = (nx * 0.5 + 0.5) * 255;
+      nrm.data[i + 1] = (ny * 0.5 + 0.5) * 255;
+      nrm.data[i + 2] = 255;
+      nrm.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  gn.putImageData(nrm, 0, 0);
+  const map = finish(c);
+  const normal = finish(cn);
+  normal.colorSpace = THREE.NoColorSpace;
+  return { map, normal };
+}
+
 export function floralTexture(bg, flower) {
   const r = rng(21);
   const [c, g] = canvas(256, 256);

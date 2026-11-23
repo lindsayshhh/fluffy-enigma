@@ -18,7 +18,7 @@ const TEXTURES = [
 const MODELS = ['lambis_shell', 'bar_chair_round_01', 'rock_07', 'rock_09'];
 // Whole scenes from Sketchfab (CC BY; see assets/CREDITS.md), kept intact so
 // props.js can split them into individual trees and plants.
-const SCENES = ['palms', 'coconut_palm', 'tropical_plants'];
+const SCENES = ['palms', 'coconut_palm', 'tropical_plants', 'lounger'];
 
 // `failed` lists anything that couldn't load, so the game can say so.
 export const assets = { tex: {}, models: {}, scenes: {}, failed: [] };

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { height, slope, shared, findShore, pathDistance } from './terrain.js';
 import { fbm, rng, smoothstep, valueNoise } from './noise.js';
 import * as T from './textures.js';
@@ -189,6 +189,157 @@ function scannedCoconutPalm() {
   return prepareVegetation(parts, { isLeaf: (p) => p.material.alphaTest > 0 || p.material.transparent, height: 7.5, keepLean: true, amp: 0.18 });
 }
 
+// A scanned teak sun lounger (Sketchfab, CC BY), rebuilt for close-ups:
+// the model only has flat colours, so its triangles are split into frame and
+// cushion by that colour, and each gets a real material with box-projected
+// UVs in metres (teak grain on the frame, woven canvas on the cushion).
+// Returns { frame, cushion } geometries, 2 m long, base at y = 0, with the
+// backrest toward +z.
+let loungerCache;
+function scannedLounger() {
+  if (loungerCache !== undefined) return loungerCache;
+  loungerCache = null;
+  const scene = assets.scenes.lounger;
+  if (!scene) return null;
+  const parts = groupMeshes(scene, () => 'l').get('l');
+  if (!parts) return null;
+  const img = parts[0].material.map && parts[0].material.map.image;
+  if (!img) return null;
+  const [cv, cx] = (() => {
+    const c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    return [c, c.getContext('2d', { willReadFrequently: true })];
+  })();
+  cx.drawImage(img, 0, 0);
+  const pix = cx.getImageData(0, 0, cv.width, cv.height).data;
+  const colourAt = (u, v) => {
+    const x = Math.min(cv.width - 1, Math.max(0, Math.floor((u - Math.floor(u)) * cv.width)));
+    const y = Math.min(cv.height - 1, Math.max(0, Math.floor((v - Math.floor(v)) * cv.height)));
+    const i = (y * cv.width + x) * 4;
+    return [pix[i], pix[i + 1], pix[i + 2]];
+  };
+
+  // Flatten every part into world-space triangle soup, tagged by colour.
+  const tris = { frame: [], cushion: [] };
+  const box = new THREE.Box3();
+  for (const p of parts) {
+    const g = p.geometry.index ? p.geometry.toNonIndexed() : p.geometry;
+    const pos = g.attributes.position;
+    const uv = g.attributes.uv;
+    for (let i = 0; i < pos.count; i += 3) {
+      let u = 0, v = 0;
+      for (let k = 0; k < 3; k++) {
+        u += uv ? uv.getX(i + k) / 3 : 0;
+        v += uv ? uv.getY(i + k) / 3 : 0;
+      }
+      const [r, gg, b] = colourAt(u, v);
+      // Cream cushion vs brown/tan wood.
+      const cushion = r > 205 && gg > 195 && b > 180;
+      const list = cushion ? tris.cushion : tris.frame;
+      for (let k = 0; k < 3; k++) {
+        const q = new THREE.Vector3(pos.getX(i + k), pos.getY(i + k), pos.getZ(i + k));
+        list.push(q);
+        box.expandByPoint(q);
+      }
+    }
+  }
+  if (!tris.frame.length || !tris.cushion.length) return null;
+
+  // Normalise: long side along z, backrest (the tall end) toward +z.
+  const size = box.getSize(new THREE.Vector3());
+  const centre = box.getCenter(new THREE.Vector3());
+  const alongX = size.x > size.z;
+  const len = Math.max(size.x, size.z);
+  const k = 2.0 / len;
+  const norm = (q) => {
+    const x = q.x - centre.x, z = q.z - centre.z;
+    return new THREE.Vector3(alongX ? z : x, q.y - box.min.y, alongX ? x : z).multiplyScalar(k);
+  };
+  let hiZ = 0, hiN = 0;
+  const all = [...tris.frame, ...tris.cushion].map(norm);
+  const top = Math.max(...all.map((q) => q.y));
+  for (const q of all) if (q.y > top * 0.7) { hiZ += q.z; hiN++; }
+  const flip = hiN && hiZ / hiN < 0 ? -1 : 1;
+
+  const build = (list, tile) => {
+    const n = list.length;
+    const P = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const q = norm(list[i]);
+      P[i * 3] = q.x * flip;
+      P[i * 3 + 1] = q.y;
+      P[i * 3 + 2] = q.z * flip;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
+    const merged = mergeVertices(geo, 1e-4);
+    merged.computeVertexNormals();
+    // Box projection, per triangle, from its face normal. Grain runs along
+    // each piece's long axis (z for slats and rails, y for legs).
+    const flat = merged.toNonIndexed();
+    const fp = flat.attributes.position;
+    const UV = new Float32Array(fp.count * 2);
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), ab = new THREE.Vector3(), fnrm = new THREE.Vector3();
+    for (let i = 0; i < fp.count; i += 3) {
+      a.fromBufferAttribute(fp, i);
+      b.fromBufferAttribute(fp, i + 1);
+      c.fromBufferAttribute(fp, i + 2);
+      fnrm.subVectors(c, b).cross(ab.subVectors(a, b)).normalize();
+      const ax = Math.abs(fnrm.x), ay = Math.abs(fnrm.y), az = Math.abs(fnrm.z);
+      for (let j = 0; j < 3; j++) {
+        const x = fp.getX(i + j), y = fp.getY(i + j), z = fp.getZ(i + j);
+        let u, v;
+        if (ay >= ax && ay >= az) { u = x; v = z; }
+        else if (ax >= az) { u = y; v = z; }
+        else { u = x; v = y; }
+        UV[(i + j) * 2] = u / tile;
+        UV[(i + j) * 2 + 1] = v / tile;
+      }
+    }
+    flat.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
+    flat.computeBoundingSphere();
+    return flat;
+  };
+  loungerCache = { frame: build(tris.frame, 0.9), cushion: build(tris.cushion, 0.09), top };
+  return loungerCache;
+}
+
+const loungerMats = {};
+function loungerMaterials(colour) {
+  if (!loungerMats.frame) {
+    loungerMats.frame =
+      texMaterial('weathered_planks', { color: new THREE.Color(0.95, 0.66, 0.42), roughness: 0.8, normalScale: 0.6 }) ||
+      new THREE.MeshStandardMaterial({ map: T.woodTexture([150, 100, 62], 3, 7), roughness: 0.75 });
+    loungerMats.weave = T.canvasWeave();
+  }
+  if (!loungerMats[colour]) {
+    const m = new THREE.MeshStandardMaterial({ map: loungerMats.weave.map, normalMap: loungerMats.weave.normal, color: colour, roughness: 0.95 });
+    m.normalScale.set(0.7, 0.7);
+    loungerMats[colour] = m;
+  }
+  return { frame: loungerMats.frame, cushion: loungerMats[colour] };
+}
+
+// A lounger at the origin of `parent`, backrest toward +z, `length` metres
+// long. Returns false if the scanned model isn't available.
+function placeLounger(parent, x, y, z, colour, length = 2.0) {
+  const L = scannedLounger();
+  if (!L) return false;
+  const mats = loungerMaterials(colour);
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  g.scale.setScalar(length / 2.0);
+  for (const [geo, mat] of [[L.frame, mats.frame], [L.cushion, mats.cushion]]) {
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    g.add(m);
+  }
+  parent.add(g);
+  return true;
+}
+
 function scannedPlants() {
   const scene = assets.scenes.tropical_plants;
   if (!scene) return null;
@@ -213,6 +364,8 @@ function scannedPlants() {
 }
 
 const MAT = {};
+// Resort cushions: mostly natural canvas, a few in the island's colours.
+const LOUNGER_CUSHIONS = ['#f1ebdd', '#f1ebdd', '#2f8f93', '#f1ebdd', '#e3825f', '#f1ebdd', '#2f8f93'];
 function initMaterials() {
   MAT.wood = new THREE.MeshStandardMaterial({ map: T.woodTexture([156, 112, 70], 6, 1, [1, 1]), roughness: 0.85 });
   MAT.deck = new THREE.MeshStandardMaterial({ map: T.woodTexture([165, 125, 85], 8, 2, [3, 3]), roughness: 0.8 });
@@ -1150,6 +1303,7 @@ export class World {
 
     // Front deck: two loungers and a little table.
     for (const sx of [-2.8, 2.8]) {
+      if (placeLounger(grp, sx, deckY, -3.2, LOUNGER_CUSHIONS[0], 1.95)) continue;
       this.box(0.8, 0.12, 2, MAT.woodWhite, sx, deckY + 0.35, -3.2, grp);
       const back = this.box(0.8, 0.9, 0.08, MAT.woodWhite, sx, deckY + 0.7, -2.2, grp);
       back.rotation.x = -0.5;
@@ -1278,13 +1432,22 @@ export class World {
       grp.position.set(l.x, g, l.z);
       grp.rotation.y = Math.PI; // face the sea (+z)
       this.scene.add(grp);
+      this.colliders.push({ x: l.x, z: l.z, r: 0.6 });
+      if (placeLounger(grp, 0, 0, 0, LOUNGER_CUSHIONS[i % LOUNGER_CUSHIONS.length])) {
+        // A rolled towel at the foot of some of them.
+        if (i % 3 === 1) {
+          const towel = this.cyl(0.07, 0.07, 0.55, new THREE.MeshStandardMaterial({ map: T.fabricTexture(['#f9c74f', '#277da1', '#f9c74f']), roughness: 1 }), 0, 0.44, -0.75, grp, 12);
+          towel.rotation.z = Math.PI / 2;
+          towel.castShadow = false;
+        }
+        return;
+      }
       const cmat = new THREE.MeshStandardMaterial({ color: cushionColors[i % 4], roughness: 0.95 });
       this.box(0.75, 0.08, 1.4, MAT.woodWhite, 0, 0.35, -0.3, grp);
       this.box(0.7, 0.08, 1.35, cmat, 0, 0.43, -0.3, grp);
       const back = this.box(0.7, 0.08, 0.9, cmat, 0, 0.75, 0.62, grp);
       back.rotation.x = 0.85;
       for (const [sx, sz] of [[-0.33, -0.9], [0.33, -0.9], [-0.33, 0.3], [0.33, 0.3]]) this.cyl(0.03, 0.03, 0.35, MAT.woodWhite, sx, 0.17, sz, grp, 5);
-      this.colliders.push({ x: l.x, z: l.z, r: 0.6 });
       // towel
       if (i % 3 === 1) {
         const towel = this.box(0.6, 0.02, 0.9, new THREE.MeshStandardMaterial({ map: T.fabricTexture(['#f9c74f', '#277da1', '#f9c74f']) }), 0, 0.48, -0.4, grp);
