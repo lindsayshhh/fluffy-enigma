@@ -158,6 +158,7 @@ const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _v = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
+const TURN_BONES = ['Bip01_Spine2', 'Bip01_Neck', 'Bip01_Head'];
 
 // Rotate a bone about the world up axis, on top of its animated pose.
 function addWorldYaw(bone, angle) {
@@ -313,7 +314,15 @@ export class Human {
     else if (this.pose === 'dance') state = 'dance';
     this.play(state);
     if (this.actions.walk) this.actions.walk.timeScale = moving ? Math.max(0.6, speed) : 1;
+    // The head turn below is added on top of the animated pose. three.js only
+    // rewrites a bone when its animated value changes, so on frames where it
+    // doesn't, last frame's turn would still be there and the turns would pile
+    // up into a spin. Put the plain animated pose back before each update.
+    const turned = TURN_BONES.map((n) => this.bones[n]);
+    this.base = this.base || turned.map((b) => (b ? b.quaternion.clone() : null));
+    turned.forEach((b, i) => b && b.quaternion.copy(this.base[i]));
     this.mixer.update(dt);
+    turned.forEach((b, i) => b && this.base[i].copy(b.quaternion));
 
     // Turn the head (and a little of the chest) toward whoever is nearby.
     // People only follow you with their eyes while you're in front of them or
