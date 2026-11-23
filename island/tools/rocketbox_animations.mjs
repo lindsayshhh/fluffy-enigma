@@ -88,6 +88,6 @@ const index = out.map((clip) => ({
   }),
 }));
 const dir = new URL('../assets/people/', import.meta.url);
-fs.writeFileSync(new URL('animations.bin', dir), Buffer.concat(chunks));
-fs.writeFileSync(new URL('animations.json', dir), JSON.stringify(index));
+// Shipped as base64 inside JSON so any static host will serve it.
+fs.writeFileSync(new URL('animations.json', dir), JSON.stringify({ clips: index, base64: Buffer.concat(chunks).toString('base64') }));
 console.log('wrote', (offset / 1024).toFixed(0), 'KB of animation data');

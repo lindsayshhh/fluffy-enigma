@@ -2,9 +2,9 @@
 
 Usage: python3 tools/rocketbox_textures.py <path to Microsoft-Rocketbox checkout>
 Writes island/assets/people/<Avatar>/{body,head}_{color,normal}.jpg and opacity.png
-and copies the avatar FBX next to them.
+and the avatar FBX (as base64 in model.json) next to them.
 """
-import glob, os, shutil, sys
+import base64, glob, json, os, sys
 from PIL import Image
 
 AVATARS = {
@@ -19,7 +19,9 @@ for name, group in AVATARS.items():
     src = os.path.join(src_root, group, name)
     out = os.path.join(out_root, name)
     os.makedirs(out, exist_ok=True)
-    shutil.copy(os.path.join(src, 'Export', name + '.fbx'), os.path.join(out, name + '.fbx'))
+    # The FBX ships as base64 inside JSON so any static host will serve it.
+    fbx = open(os.path.join(src, 'Export', name + '.fbx'), 'rb').read()
+    json.dump({'format': 'fbx', 'base64': base64.b64encode(fbx).decode('ascii')}, open(os.path.join(out, 'model.json'), 'w'))
     made = []
     for part in ('body', 'head'):
         for kind in ('color', 'normal'):

@@ -51,7 +51,7 @@ export async function loadAssets(renderer, onProgress) {
 
   const modelJobs = MODELS.map((name) =>
     gltfLoader
-      .loadAsync(`assets/models/${name}/${name}.gltf`)
+      .loadAsync(`assets/models/${name}/${name}.json`) // glTF with its buffer embedded
       .then((g) => {
         let mesh = null;
         g.scene.traverse((o) => {

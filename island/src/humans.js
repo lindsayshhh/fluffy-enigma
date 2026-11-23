@@ -22,13 +22,19 @@ export const EXTRAS = [
   { avatar: 'Female_Party_01', sex: 'f', idle: 'f_calm', evening: 'f_dance' },
 ];
 
+// Binary data ships as base64 inside JSON so any static host will serve it.
+function decodeBase64(s) {
+  const raw = atob(s);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out.buffer;
+}
+
 async function loadClips() {
-  const [index, bin] = await Promise.all([
-    fetch(BASE + 'animations.json').then((r) => r.json()),
-    fetch(BASE + 'animations.bin').then((r) => r.arrayBuffer()),
-  ]);
+  const packed = await fetch(BASE + 'animations.json').then((r) => r.json());
+  const bin = decodeBase64(packed.base64);
   const clips = {};
-  for (const c of index) {
+  for (const c of packed.clips) {
     const tracks = c.tracks.map((t) => {
       const size = t.type === 'q' ? 4 : 3;
       const times = new Uint16Array(bin, t.offset, t.keys);
@@ -53,7 +59,8 @@ async function loadAvatar(name, texLoader, fbxLoader) {
       },
       () => null
     );
-  const model = await fbxLoader.loadAsync(dir + name + '.fbx');
+  const packed = await fetch(dir + 'model.json').then((r) => r.json());
+  const model = fbxLoader.parse(decodeBase64(packed.base64), dir);
   let hasOpacity = false;
   model.traverse((o) => {
     if (o.isMesh) for (const m of [].concat(o.material)) if ((m.name || '').toLowerCase().includes('opacity')) hasOpacity = true;

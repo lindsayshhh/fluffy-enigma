@@ -32,7 +32,7 @@ Each has `_diff` (colour), `_nor` (OpenGL normal) and `_arm` (ambient occlusion 
 
 The characters are avatars and motion-captured animations from the [Microsoft Rocketbox avatar library](https://github.com/microsoft/Microsoft-Rocketbox), released under the MIT licence (see `people/LICENSE.md`). The library's authors ask research users to cite: Gonzalez-Franco et al., "The Rocketbox Library and the Utility of Freely Available Rigged Avatars", *Frontiers in Virtual Reality*, 2020.
 
-Textures were downsized from 2K TGA to 1K JPEG/PNG with `tools/rocketbox_textures.py`, and 15 animations were trimmed, quantised and packed into `animations.bin` with `tools/rocketbox_animations.mjs`.
+Textures were downsized from 2K TGA to 1K JPEG/PNG with `tools/rocketbox_textures.py`, and 15 animations were trimmed, quantised and packed into `animations.json` with `tools/rocketbox_animations.mjs`. Binary data (model buffers, FBX files, animation data) is stored as base64 inside JSON by `tools/pack_binaries.py`, so any static host can serve it.
 
 | Role | Avatar |
 | --- | --- |
