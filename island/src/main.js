@@ -16,6 +16,7 @@ import { Post } from './post.js';
 import { Weather } from './weather.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 import { CHARACTERS } from './dialogue.js';
+import { Dolphin } from './dolphin.js';
 
 const TOUCH = isTouchDevice();
 if (TOUCH) document.body.classList.add('touch');
@@ -126,6 +127,13 @@ async function build() {
     assets.failed.push('characters');
   }
   setupExtras(extras);
+  if (assets.scenes.dolphin) {
+    try {
+      dolphin = new Dolphin(scene, assets.scenes.dolphin, assets.clips.dolphin, L);
+    } catch (e) {
+      console.warn('Dolphin failed to set up', e);
+    }
+  }
   const gull = makeSeagull();
   scene.add(gull);
   audio = new Audio();
@@ -160,6 +168,7 @@ async function build() {
   };
   game = fresh();
   addExtraInteractions(game);
+  if (dolphin) addDolphin(game);
   player.teleport(L.spawn.x, L.spawn.z, world.myHut.deckY, -0.7);
 
   // Debug hooks: ?hour=17.5 starts at a given time, ?at=bar teleports.
@@ -205,7 +214,7 @@ async function build() {
     post = null;
   }
 
-  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList };
+  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList, dolphin: () => dolphin };
   requestAnimationFrame(loop);
 }
 
@@ -289,6 +298,14 @@ function loop() {
   if (started) {
     player.update(dt, t);
     game.update(dt, t);
+    if (dolphin) {
+      const talkingReg = game.talking === 'reg';
+      dolphin.update(dt, t, { player, hour: game.s.hour % 24, talking: talkingReg, speaking: talkingReg && ui.typing });
+      if (talkingReg && ui.typing && t - lastClick > 0.22) {
+        lastClick = t;
+        audio.dolphin();
+      }
+    }
     game.keepPlayerOut(extraList.map((e) => e.h.group));
     player.syncCamera(t);
     const f = game.focus();
@@ -368,6 +385,7 @@ function loop() {
     const ex = extraList.find((e) => e.h.role.key === game.talking);
     const n = game.npcs[game.talking] ? game.npcs[game.talking].pos : ex && ex.h.group.position;
     if (n) dof = camera.position.distanceTo(_head.set(n.x, n.y + 1.6, n.z));
+    else if (game.talking === 'reg' && dolphin) dof = camera.position.distanceTo(dolphin.head(_head));
   }
   if (post) {
     post.setSun(sky.dir, sky.elevation, st.sun, under);
@@ -409,6 +427,31 @@ function setupExtras(extras) {
     return { h, cfg };
   });
 }
+// Reg the dolphin: talkable when he's come over and is waiting at the surface.
+let dolphin = null;
+let lastClick = 0;
+function addDolphin(g) {
+  g.dolphin = dolphin;
+  dolphin.onSplash = (big) => audio.splash(big);
+  dolphin.onTowDone = () => {
+    const m = g.mult('regTow');
+    g.fx({ fun: 18 * m, relax: 6 * m, energy: -4 });
+    ui.toast('Reg lets you go with a flick of his tail. You are grinning so hard your face hurts.', 'good');
+    g.memory('reg_tow', "Held on to a dolphin's fin and got towed right round the bay. Reg said it counts as cardio.");
+  };
+  g.interactables.push({
+    kind: 'npc',
+    key: 'reg',
+    r: 4.2,
+    get pos() {
+      return dolphin.pos;
+    },
+    visible: () => dolphin.state === 'wait' && !dolphin.trick && !dolphin.tow,
+    label: () => (g.s.flags.metReg ? 'Talk to Reg' : 'Say hello to the dolphin'),
+    act: () => g.openDialogue('reg'),
+  });
+}
+
 // Beachgoers with something to say (only Skye, for now) become talkable.
 function addExtraInteractions(g) {
   for (const e of extraList) {

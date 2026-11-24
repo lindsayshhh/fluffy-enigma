@@ -44,7 +44,7 @@ Textures were downsized from 2K TGA to 1K JPEG/PNG with `tools/rocketbox_texture
 | Nana Pearl | Female_Adult_14 |
 | Beachgoers | Sports_Female_01, Sports_Male_01, Female_Party_01 |
 
-## Palms, plants and loungers (`sketchfab/`)
+## Palms, plants, loungers and Reg (`sketchfab/`)
 
 These models come from [Sketchfab](https://sketchfab.com) under the [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/) licence (CC BY 4.0). They were converted with `tools/sketchfab_convert.py`: textures downsized to 512–1024 px and the geometry repackaged as glTF JSON. In the game they are split into individual plants, rescaled and given wind sway.
 
@@ -54,3 +54,4 @@ These models come from [Sketchfab](https://sketchfab.com) under the [Creative Co
 | `coconut_palm` | ["Coconut Palm"](https://sketchfab.com/3d-models/coconut-palm-26e787f2ff2e4c0fb004c3b0210805a3) | evolveduk |
 | `tropical_plants` | ["Tropical Plants Pack M02P"](https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0) | MozzarellaARC |
 | `lounger` | ["teak sun lounger"](https://sketchfab.com/3d-models/teak-sun-lounger-a150189e9a92485897ed2dcfc1856c17) | nonsenseblve (modified: split into frame and cushion and re-textured with wood grain and woven canvas) |
+| `dolphin` | ["Game-Ready dolphin (Swimming)"](https://sketchfab.com/3d-models/game-ready-dolphin-swimming-b621ec8894734bc79c04338edff3cd0d) | Allie2k (model and swim animation; used for Reg) |

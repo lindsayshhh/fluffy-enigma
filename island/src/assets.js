@@ -18,10 +18,10 @@ const TEXTURES = [
 const MODELS = ['lambis_shell', 'bar_chair_round_01', 'rock_07', 'rock_09'];
 // Whole scenes from Sketchfab (CC BY; see assets/CREDITS.md), kept intact so
 // props.js can split them into individual trees and plants.
-const SCENES = ['palms', 'coconut_palm', 'tropical_plants', 'lounger'];
+const SCENES = ['palms', 'coconut_palm', 'tropical_plants', 'lounger', 'dolphin'];
 
 // `failed` lists anything that couldn't load, so the game can say so.
-export const assets = { tex: {}, models: {}, scenes: {}, failed: [] };
+export const assets = { tex: {}, models: {}, scenes: {}, clips: {}, failed: [] };
 
 // Load one of our glTF JSON files whose geometry is embedded as a base64
 // data: URI. Strict hosts (claude.ai artifacts) block fetching data: URIs,
@@ -118,6 +118,7 @@ export async function loadAssets(renderer, onProgress) {
       .then((g) => {
         g.scene.updateMatrixWorld(true);
         assets.scenes[name] = g.scene;
+        assets.clips[name] = g.animations;
         tick();
       })
       .catch((e) => {

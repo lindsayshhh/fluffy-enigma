@@ -2,7 +2,7 @@
 
 A first-person vacation game. You're a guest on a small tropical island for three days. Your goal is to have as much **fun** and be as **relaxed** as possible before the boat leaves, with help from the island's residents (and despite one seagull).
 
-It runs in the browser on [three.js](https://threejs.org/), with no build step. The island, palms, water and sound are generated in code; surfaces and a few props use photoscanned textures and models from [Poly Haven](https://polyhaven.com) (CC0), and the characters are realistic, motion-captured avatars from the [Microsoft Rocketbox library](https://github.com/microsoft/Microsoft-Rocketbox) (MIT). The palms, tropical plants and sun loungers are Sketchfab models by Next Spring, evolveduk, MozzarellaARC and nonsenseblve (CC BY 4.0). See [`assets/CREDITS.md`](assets/CREDITS.md). If any of those files are missing, the game falls back to its procedural look.
+It runs in the browser on [three.js](https://threejs.org/), with no build step. The island, palms, water and sound are generated in code; surfaces and a few props use photoscanned textures and models from [Poly Haven](https://polyhaven.com) (CC0), and the characters are realistic, motion-captured avatars from the [Microsoft Rocketbox library](https://github.com/microsoft/Microsoft-Rocketbox) (MIT). The palms, tropical plants, sun loungers and Reg the dolphin are Sketchfab models by Next Spring, evolveduk, MozzarellaARC, nonsenseblve and Allie2k (CC BY 4.0). See [`assets/CREDITS.md`](assets/CREDITS.md). If any of those files are missing, the game falls back to its procedural look.
 
 ## Run it
 
@@ -65,6 +65,7 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 - **Marisol Vega-Sun** leads sunset yoga and will tell you about your aura whether you ask or not.
 - **Nana Pearl**, 84, plays beach volleyball and is undefeated since Tuesday.
 - **Skye Marlowe** is a lifestyle creator with 412 very engaged followers. She has been on the south beach for six hours and has not touched the water, only its hashtag.
+- **Reg** is a bottlenose dolphin on sabbatical from his job as Regional Sardine Coordinator (42 meetings a day). He patrols the bay west of the dock and comes over if you swim, paddle or stand at the end of the dock. Ask nicely and he'll leap, spin, or tow you round the bay.
 - **Kevin** is a seagull. Kevin wants your churro.
 
 ## Code layout
@@ -79,6 +80,7 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 | `src/layout.js` | Where everything sits, derived from the real shoreline |
 | `src/humans.js` | Realistic Rocketbox characters: loading, animation blending, head tracking, lip movement and blinking, props |
 | `src/weather.js` | Showers, wet ground, rain sound cues, the overcast veil and rainbows |
+| `src/dolphin.js` | Reg: patrolling, surfacing, coming over to talk, leaps and tow rides |
 | `src/touch.js` | On-screen joystick, drag-to-look and buttons for touch screens |
 | `src/post.js` | Post-processing: ambient occlusion, bloom, depth of field in conversations, colour grade, vignette, film grain |
 | `src/people.js` | Fallback procedural characters, and Kevin |

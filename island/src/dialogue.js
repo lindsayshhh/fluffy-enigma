@@ -701,6 +701,104 @@ export const CHARACTERS = {
     },
   },
 
+  // ----------------------------------------------------------------- REG
+  reg: {
+    name: 'Reg',
+    title: 'Bottlenose dolphin, on sabbatical',
+    color: '#3f6f8f',
+    start: (s) => (s.flags.metReg ? 'hub' : 'intro'),
+    nodes: {
+      intro: {
+        text: "*Click-click-wheeee.* Oh, sorry. Wrong language. Hi. Reg. Bottlenose. I'm on sabbatical.",
+        choices: [
+          { text: 'A sabbatical from what?', go: 'job' },
+          { text: '...You can talk?', go: 'talk' },
+        ],
+      },
+      talk: {
+        text: "Everyone can talk. Most people just don't stop to listen. Also I took an online course. Mostly the course.",
+        choices: [{ text: 'A sabbatical from what, though?', go: 'job' }],
+      },
+      job: {
+        text: 'I was Regional Sardine Coordinator for the eastern pod. Forty-two meetings a day. Every one of them could have been a sonar ping.',
+        choices: [
+          { text: 'That sounds awful.', set: ['metReg'], fx: { fun: 5 }, go: 'quit' },
+          { text: 'Dolphins have meetings?', set: ['metReg'], fx: { fun: 6 }, go: 'circle' },
+        ],
+      },
+      quit: {
+        text: "It was. Then one morning I just... swam the other way. Didn't even set an out-of-office. Best decision of my life. Want to see something?",
+        choices: [{ text: 'Sure.', go: 'hub' }],
+      },
+      circle: {
+        text: "Dolphins invented meetings. Why do you think we're always swimming in circles? Anyway. I'm free now. Want to see something?",
+        choices: [{ text: 'Sure.', go: 'hub' }],
+      },
+      hub: {
+        text: (s, g) =>
+          pick(g, 'regHub', [
+            "The water's great today. It's always great. That's the thing about water.",
+            "Back again! You look less like a spreadsheet than yesterday. It suits you.",
+            'I had a fish for breakfast. And for lunch. Living the dream. The dream is fish.',
+            "I've been practising doing nothing. I'm up to nine whole minutes. Personal best.",
+          ]),
+        choices: [
+          {
+            text: 'Do a trick!',
+            close: true,
+            act: (g) => {
+              const spin = g.counter('regTrick') % 2 === 1;
+              g.dolphin.leap(spin ? 'spin' : 'leap');
+              const m = g.mult('regTrick');
+              setTimeout(() => {
+                g.ui.toast(spin ? 'Reg corkscrews out of the sea, spins twice and lands with a smack. Show-off.' : 'Reg launches clean out of the water and arcs over the waves.', 'good');
+                g.fx({ fun: 10 * m, relax: 3 * m });
+                g.memory('reg_leap', 'Watched a dolphin leap clear out of the sea, just for you.');
+              }, 1300);
+            },
+          },
+          { text: 'Can I hold on to your fin?', if: (s, g) => g.player.swimming, close: true, act: (g) => g.dolphin.startTow(g.player) },
+          { text: 'Can I hold on to your fin?', if: (s, g) => !g.player.swimming, go: 'noride' },
+          { text: 'Will you take my phone? Please.', if: (s) => s.items.phone, go: 'phone' },
+          { text: 'Heard any gossip?', go: 'gossip' },
+          { text: 'See you, Reg.', end: true },
+        ],
+      },
+      noride: {
+        text: "Get in the water first. I'm not a ferry. I'm a dolphin with boundaries.",
+        choices: [{ text: 'Fair.', go: 'hub' }],
+      },
+      phone: {
+        text: "He looks at the phone. He looks at you. 'Say no more.' He takes it gently in his beak, the way you'd carry something that had hurt you. 'I'll escalate it to the trench.' He dives. A few seconds later a single bubble comes up. It feels final.",
+        choices: [
+          {
+            text: 'Thank you, Reg.',
+            act: (g) => {
+              g.take('phone');
+              g.fx({ relax: 22, fun: 8 });
+              g.memory('reg_phone', "Handed your work phone to a dolphin, who promised to 'escalate it to the trench.'");
+            },
+            end: true,
+          },
+        ],
+      },
+      gossip: {
+        text: (s, g) => {
+          const lines = [
+            "The captain's first boat? I was there. I've said nothing. I will say nothing. ...It was the anchor. He forgot to tie the anchor to the boat. Then he threw it in. While standing on it.",
+            "That seagull, Kevin, owes me three fish. I'm not saying I'm keeping score. I'm keeping score.",
+            'Dez once made me a drink. I do not have hands. He made it anyway and left it on the dock. Respect.',
+            "The man with the laptop holds it up over his head every day like he's offering it to the sky. The sky has not accepted.",
+          ];
+          if (s.flags.metSkye && !s.flags.skyePhoneDown) lines.push("The girl with the phone has photographed my fin forty-one times. She has never once looked at me. I counted. I'm a dolphin, I have time.");
+          if (!s.items.sandal && !s.memories.some((m) => m.id === 'sandal')) lines.push("There's a sandal down by the dock that says GARY inside. I've been wearing it as a hat. Don't tell him.");
+          return pick(g, 'regGossip', lines);
+        },
+        choices: [{ text: 'Reg!', fx: { fun: 4 }, go: 'hub' }],
+      },
+    },
+  },
+
   // --------------------------------------------------------------- PHONE
   phone: {
     name: 'Your Phone',

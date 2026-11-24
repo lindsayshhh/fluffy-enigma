@@ -268,6 +268,35 @@ export class Audio {
     [110, 164.8, 220.5, 296, 391].forEach((f, i) => this.tone(f, 5 - i * 0.6, { vol: 0.12 / (i + 1), attack: 0.01 }));
   }
 
+  // Dolphin chatter: quick high clicks with the odd whistle.
+  dolphin() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (Math.random() < 0.25) this.tone(5200 + Math.random() * 1500, 0.22, { vol: 0.025, at: t, slide: 7600 + Math.random() * 1500, dest: this.master });
+    else for (let i = 0; i < 4; i++) this.tone(3800 + Math.random() * 1800, 0.018, { type: 'square', vol: 0.02, at: t + i * 0.035, dest: this.master });
+  }
+
+  // A splash: a short burst of filtered noise.
+  splash(big = false) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const len = Math.floor(ctx.sampleRate * (big ? 1.2 : 0.5));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, big ? 2.5 : 3.5);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(big ? 2600 : 3600, t);
+    f.frequency.exponentialRampToValueAtTime(400, t + (big ? 1.1 : 0.45));
+    const g = ctx.createGain();
+    g.gain.value = big ? 0.35 : 0.18;
+    src.connect(f).connect(g).connect(this.master);
+    src.start(t);
+  }
+
   whistle() {
     if (!this.ctx) return;
     this.tone(2600, 0.6, { type: 'square', vol: 0.04, slide: 2400 });
