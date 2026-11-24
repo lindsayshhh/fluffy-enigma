@@ -42,7 +42,12 @@ Textures were downsized from 2K TGA to 1K JPEG/PNG with `tools/rocketbox_texture
 | Gary | Male_Adult_08 |
 | Marisol | Female_Adult_03 |
 | Nana Pearl | Female_Adult_14 |
-| Beachgoers | Sports_Female_01, Sports_Male_01, Female_Party_01 |
+| Skye Marlowe | Sports_Female_01 |
+| Chad Bronson (lifeguard) | Sports_Male_01 |
+| Gordon Pratt | Male_Adult_03 (recoloured: Hawaiian shirt) |
+| Doris Huxley | Female_Adult_13 (recoloured: floral cover-up) |
+| Walt Huxley | Male_Adult_05 |
+| Beachgoer | Female_Party_01 |
 
 ## Palms, plants, loungers and animals (`sketchfab/`)
 

@@ -1,6 +1,6 @@
 """Convert Microsoft Rocketbox avatar textures (2K TGA) into web-sized files.
 
-Usage: python3 tools/rocketbox_textures.py <path to Microsoft-Rocketbox checkout>
+Usage: python3 tools/rocketbox_textures.py <path to Microsoft-Rocketbox checkout> [avatar names...]
 Writes island/assets/people/<Avatar>/{body,head}_{color,normal}.jpg and opacity.png
 and the avatar FBX (as base64 in model.json) next to them.
 """
@@ -11,11 +11,15 @@ AVATARS = {
     'Male_Adult_12': 'Adults', 'Female_Adult_01': 'Adults', 'Male_Adult_14': 'Adults',
     'Male_Adult_08': 'Adults', 'Female_Adult_03': 'Adults', 'Female_Adult_14': 'Adults',
     'Sports_Female_01': 'Professions', 'Sports_Male_01': 'Professions', 'Female_Party_01': 'Adults',
+    'Male_Adult_03': 'Adults', 'Female_Adult_13': 'Adults', 'Male_Adult_05': 'Adults',
 }
+only = set(sys.argv[2:])
 src_root = os.path.join(sys.argv[1], 'Assets', 'Avatars')
 out_root = os.path.join(os.path.dirname(__file__), '..', 'assets', 'people')
 
 for name, group in AVATARS.items():
+    if only and name not in only:
+        continue
     src = os.path.join(src_root, group, name)
     out = os.path.join(out_root, name)
     os.makedirs(out, exist_ok=True)

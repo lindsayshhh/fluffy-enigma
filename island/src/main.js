@@ -18,6 +18,7 @@ import { TouchControls, isTouchDevice } from './touch.js';
 import { CHARACTERS } from './dialogue.js';
 import { Dolphin } from './dolphin.js';
 import { Wildlife, SPECIES } from './wildlife.js';
+import { Pool } from './pool.js';
 
 const TOUCH = isTouchDevice();
 if (TOUCH) document.body.classList.add('touch');
@@ -112,6 +113,11 @@ async function build() {
   status('Planting palms…');
   await step();
   world = new World(scene, L);
+  try {
+    pool = new Pool(scene, world, L);
+  } catch (e) {
+    console.warn('Pool failed to build', e);
+  }
 
   status('Waking up the locals…');
   await step();
@@ -176,6 +182,7 @@ async function build() {
   addExtraInteractions(game);
   if (dolphin) addDolphin(game);
   if (wildlife) hookWildlife(game);
+  if (pool) hookPool(game);
   player.teleport(L.spawn.x, L.spawn.z, world.myHut.deckY, -0.7);
 
   // Debug hooks: ?hour=17.5 starts at a given time, ?at=bar teleports.
@@ -221,7 +228,7 @@ async function build() {
     post = null;
   }
 
-  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList, dolphin: () => dolphin, wildlife: () => wildlife };
+  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList, dolphin: () => dolphin, wildlife: () => wildlife, pool: () => pool };
   requestAnimationFrame(loop);
 }
 
@@ -306,6 +313,10 @@ function loop() {
     player.update(dt, t);
     game.update(dt, t);
     if (wildlife) wildlife.update(dt, t, { player, hour: game.s.hour % 24, rain: weather.rain, camera });
+    if (pool) {
+      pool.update(dt, t, player);
+      checkPoolRunning(t);
+    }
     if (dolphin) {
       const talkingReg = game.talking === 'reg';
       dolphin.update(dt, t, { player, hour: game.s.hour % 24, talking: talkingReg, speaking: talkingReg && ui.typing });
@@ -429,11 +440,119 @@ function setupExtras(extras) {
       return { day: { x: l.x - 1.5, z: l.z + 3.5, face: -0.4 }, night: { x: L.bar.x - 8.5, z: L.bar.z + 6, face: 0.8 }, hours: [9, 24.5] };
     },
   ];
-  extraList = extras.map((h, i) => {
-    const cfg = spots[i % spots.length]();
-    scene.add(h.group);
-    return { h, cfg };
+  // The pool crowd stand where pool.js says, at their own hours.
+  const poolHours = { chad: [9, 18], gordon: [7, 23.5], doris: [7, 17], walt: [7, 17] };
+  const byKey = { skye: spots[0] };
+  extraList = extras
+    .map((h, i) => {
+      const key = h.role.key;
+      let cfg;
+      if (key && poolHours[key]) {
+        if (!pool) return null;
+        cfg = { day: pool.spots[key], hours: poolHours[key], rainproof: key === 'gordon' };
+      } else if (byKey[key]) cfg = byKey[key]();
+      else cfg = spots[2]();
+      scene.add(h.group);
+      return { h, cfg };
+    })
+    .filter(Boolean);
+}
+
+// The pool: slide, cannonballs, the flamingo, loungers, and Chad's whistle.
+let pool = null;
+let poolWhistle = 0;
+function hookPool(g) {
+  g.pool = pool;
+  const P = pool;
+  const chadHere = () => extraList.some((e) => e.h.role.key === 'chad' && e.h.group.visible);
+  g.interactables.push({
+    pos: P.slideBase,
+    r: 2.2,
+    y: P.deck,
+    label: () => 'Ride the water slide',
+    act: () => {
+      g.busy = true;
+      audio.blip('good');
+      P.startSlide(player, () => {
+        g.busy = false;
+        audio.splash(true);
+        const m = g.mult('slide');
+        g.fx({ fun: 16 * m, relax: 2 * m, energy: -3 });
+        ui.toast(['WHEEEEEEEE. You shoot out of the bottom of the slide and hit the water like a happy torpedo.', 'Faster this time. You might have screamed. Gordon gives you a thumbs up.', 'You go down backwards. It is a mistake. It is also wonderful.'][g.counter('slideLine') % 3], 'good');
+        g.memory('slide', 'Went down the water slide and screamed the whole way. Gordon gave it a ten.');
+      });
+    },
   });
+  g.interactables.push({
+    pos: { x: P.board.x0 - 0.4, z: P.board.z },
+    r: 1.8,
+    y: P.deck,
+    label: () => 'Cannonball off the diving board!',
+    act: () => {
+      g.busy = true;
+      P.startCannonball(player, () => {
+        g.busy = false;
+        audio.splash(true);
+        const m = g.mult('cannonball');
+        g.fx({ fun: 14 * m, energy: -3 });
+        if (chadHere()) {
+          const a = (6 + Math.random() * 3.5).toFixed(1);
+          const b = (6 + Math.random() * 3.5).toFixed(1);
+          const doris = Math.random() < 0.15 ? 4 : Math.floor(1 + Math.random() * 3);
+          ui.toast(`SPLOOSH. Chad holds up scorecards: ${a}, ${b}, and a ${doris} from Doris, who got wet.`, 'good');
+          g.memory('cannonball', `Did a cannonball off the diving board. Chad scored it ${a} and ${b}. Doris gave it a ${doris}.`);
+        } else {
+          ui.toast('SPLOOSH. A perfect cannonball, witnessed by nobody. The best kind.', 'good');
+          g.memory('cannonball', 'Did a cannonball off the diving board. Nobody saw. It was perfect.');
+        }
+      });
+    },
+  });
+  const flam = P.floaties[0];
+  g.interactables.push({
+    get pos() {
+      return flam.o.position;
+    },
+    r: 1.9,
+    label: () => (player.swimming ? 'Flop onto the inflatable flamingo' : null),
+    act: () => {
+      const m = g.mult('flamingo');
+      g.narrate(
+        [['You haul yourself onto the flamingo with all the grace of a walrus climbing a bouncy castle. It squeaks. You float. The flamingo stares at the sky with you.', 'The flamingo spins you slowly in a circle. Every few turns the slide comes into view, then Chad, then the sea. It feels like a very slow, very good fairground ride.'][g.counter('flamingo') % 2]],
+        () => {
+          g.fx({ relax: 16 * m, fun: 8 * m });
+          g.memory('flamingo', 'Floated around the pool on an inflatable flamingo. Did not fall off. Mostly.');
+        },
+        0.5
+      );
+    },
+  });
+  for (const l of P.loungers) {
+    g.interactables.push({
+      pos: l,
+      r: 1.6,
+      y: P.deck,
+      label: () => (l.reserved && !g.s.flags.towelPeace ? 'Lie on a reserved lounger' : 'Lounge by the pool'),
+      act: () => {
+        if (l.reserved && !g.s.flags.towelPeace) {
+          ui.toast("Walt appears out of nowhere. 'That one's reserved,' he says quietly. He doesn't look happy about it either.", 'neutral');
+          return;
+        }
+        const m = g.mult('poolLounge');
+        g.narrate([["You stretch out by the pool. Somewhere, a cannonball. Somewhere else, Chad's whistle. Neither of them is your problem.", 'Sun, a breeze, the smell of chlorine and coconut sunscreen. Gordon is humming. You doze off for a bit.'][g.counter('poolLounge') % 2]], () => g.fx({ relax: 14 * m, fun: 3 * m, energy: 6 }), 1);
+      },
+    });
+  }
+}
+
+// Chad doesn't allow running on his deck.
+function checkPoolRunning(t) {
+  if (!pool || !player.running || player.swimming || !pool.onDeck(player.pos.x, player.pos.z)) return;
+  if (Math.abs(player.pos.y - pool.deck) > 0.5 || t - poolWhistle < 15) return;
+  if (!extraList.some((e) => e.h.role.key === 'chad' && e.h.group.visible)) return;
+  poolWhistle = t;
+  audio.whistle();
+  ui.toast(["Chad: *FWEEEEP* 'WALK! This is a pool, not a marathon!'", "Chad: *FWEEEEP* 'Running is for people being chased by bears. Do you see a bear?'", "Chad: *FWEEEEP* 'That's a warning! Next time it's a stern look!'"][Math.floor(Math.random() * 3)], 'neutral');
 }
 // Wildlife: a toast the first time you spot each species; a memory for all.
 let wildlife = null;
@@ -495,7 +614,7 @@ function addExtraInteractions(g) {
 function updateExtras(dt, t, hour) {
   for (const { h, cfg } of extraList) {
     // Beachgoers head indoors when it rains.
-    const on = hour >= cfg.hours[0] && hour < cfg.hours[1] && weather.rain < 0.3;
+    const on = hour >= cfg.hours[0] && hour < cfg.hours[1] && (weather.rain < 0.3 || cfg.rainproof);
     h.group.visible = on;
     if (!on) continue;
     const evening = cfg.night && hour >= 19;

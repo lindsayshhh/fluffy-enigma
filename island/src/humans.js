@@ -18,8 +18,12 @@ export const CASTING = {
 };
 export const EXTRAS = [
   { avatar: 'Sports_Female_01', sex: 'f', idle: 'f_calm', key: 'skye', selfie: true },
-  { avatar: 'Sports_Male_01', sex: 'm', idle: 'm_stretch' },
+  { avatar: 'Sports_Male_01', sex: 'm', idle: 'm_look', key: 'chad', hat: 'visor' },
   { avatar: 'Female_Party_01', sex: 'f', idle: 'f_calm', evening: 'f_dance' },
+  // The pool crowd.
+  { avatar: 'Male_Adult_03', sex: 'm', idle: 'm_breathe', key: 'gordon', beachwear: true, drink: true },
+  { avatar: 'Female_Adult_13', sex: 'f', idle: 'f_nervous', key: 'doris', beachwear: true, hat: 'sunhat' },
+  { avatar: 'Male_Adult_05', sex: 'm', idle: 'm_idle', key: 'walt' },
 ];
 
 // Binary data ships as base64 inside JSON so any static host will serve it.
@@ -199,6 +203,52 @@ function makePhone() {
   return phone;
 }
 
+// A wide straw sun hat.
+function makeSunhat() {
+  const straw = new THREE.MeshStandardMaterial({ color: 0xe9d29a, roughness: 0.9, side: THREE.DoubleSide });
+  const band = new THREE.MeshStandardMaterial({ color: 0xe0457b, roughness: 0.6 });
+  const g = new THREE.Group();
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.012, 32), straw);
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.125, 0.12, 24), straw);
+  crown.position.y = 0.06;
+  const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(0.127, 0.127, 0.035, 24), band);
+  ribbon.position.y = 0.02;
+  g.add(brim, crown, ribbon);
+  g.traverse((o) => (o.castShadow = true));
+  g.userData.offset = 0.08;
+  return g;
+}
+
+// A red lifeguard visor.
+function makeVisor() {
+  const red = new THREE.MeshStandardMaterial({ color: 0xd62828, roughness: 0.5, side: THREE.DoubleSide });
+  const g = new THREE.Group();
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.105, 0.045, 24, 1, true), red);
+  const peak = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.01, 24, 1, false, -Math.PI / 2.4, Math.PI / 1.2), red);
+  peak.position.set(0, -0.015, 0.06);
+  peak.scale.set(1, 1, 1.25);
+  g.add(band, peak);
+  g.traverse((o) => (o.castShadow = true));
+  g.userData.offset = 0.135;
+  return g;
+}
+
+// A tall cocktail with a paper umbrella.
+function makeDrink() {
+  const g = new THREE.Group();
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.025, 0.16, 14, 1, true), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, roughness: 0.05, side: THREE.DoubleSide }));
+  const juice = new THREE.Mesh(new THREE.CylinderGeometry(0.031, 0.024, 0.12, 14), new THREE.MeshStandardMaterial({ color: 0xff7a3d, roughness: 0.3 }));
+  juice.position.y = -0.015;
+  const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.14, 4), new THREE.MeshStandardMaterial({ color: 0x8b5a2b }));
+  stick.position.set(0.02, 0.11, 0);
+  stick.rotation.z = -0.3;
+  const umb = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.025, 10), new THREE.MeshStandardMaterial({ color: 0xff4f9a, roughness: 0.6 }));
+  umb.position.set(0.04, 0.17, 0);
+  umb.rotation.z = -0.3;
+  g.add(glass, juice, stick, umb);
+  return g;
+}
+
 function makeLaptop() {
   const laptop = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, metalness: 0.7, roughness: 0.3 });
@@ -258,8 +308,12 @@ export class Human {
     this.brow = 0;
 
     if (role.hat) {
-      this.hat = makeHat();
+      this.hat = role.hat === 'sunhat' ? makeSunhat() : role.hat === 'visor' ? makeVisor() : makeHat();
       this.group.add(this.hat);
+    }
+    if (role.drink) {
+      this.drink = makeDrink();
+      this.group.add(this.drink);
     }
     if (role.laptop) {
       this.laptop = makeLaptop();
@@ -364,8 +418,17 @@ export class Human {
     if (this.hat && head) {
       head.getWorldPosition(_v);
       this.group.worldToLocal(_v);
-      this.hat.position.copy(_v).add(new THREE.Vector3(0, 0.13, 0.0));
+      this.hat.position.copy(_v).add(new THREE.Vector3(0, this.hat.userData.offset ?? 0.13, 0.0));
       this.hat.rotation.set(-0.08, this.headYaw * 0.9, 0);
+    }
+    if (this.drink) {
+      // Held in the right hand, upright.
+      const r = this.bones.Bip01_R_Hand;
+      if (r) {
+        r.getWorldPosition(_v);
+        this.group.worldToLocal(_v);
+        this.drink.position.copy(_v).add(new THREE.Vector3(0, 0.05, 0.04));
+      }
     }
     if (this.phone) {
       // Held up at arm's length for a selfie while the photo pose plays.

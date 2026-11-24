@@ -799,6 +799,229 @@ export const CHARACTERS = {
     },
   },
 
+  // ---------------------------------------------------------------- CHAD
+  chad: {
+    name: 'Chad Bronson',
+    title: 'Lifeguard (Certified*)',
+    color: '#d62828',
+    start: (s) => (s.flags.metChad ? 'hub' : 'intro'),
+    nodes: {
+      intro: {
+        text: "*FWEEEEP.* Whoa. Whoa whoa whoa. That was a very confident walk. Borderline jog. I'm watching you. I'm Chad. I'm the lifeguard.",
+        choices: [
+          { text: "What's the asterisk for?", set: ['metChad'], go: 'asterisk' },
+          { text: 'Can you swim?', set: ['metChad'], go: 'swim' },
+        ],
+      },
+      asterisk: {
+        text: 'Online course. Forty minutes. I got ninety-one percent. The other nine percent was the water part.',
+        choices: [{ text: 'Reassuring.', fx: { fun: 5 }, go: 'hub' }],
+      },
+      swim: {
+        text: "I'm a lifeguard. I guard. Swimming is a whole separate department.",
+        choices: [{ text: 'Of course.', fx: { fun: 5 }, go: 'hub' }],
+      },
+      hub: {
+        text: (s, g) =>
+          pick(g, 'chadHub', [
+            'Eyes on the water. Always. Except when I blink. I try to blink in shifts.',
+            "Someone said 'Marco' an hour ago and nobody's said 'Polo' yet. I'm worried. I'm not getting in, but I'm worried.",
+            "Every day I put on the visor and I become something greater. A man in a visor.",
+          ]),
+        choices: [
+          { text: 'Will you judge my cannonball?', go: 'judge' },
+          { text: 'Ever had to save anyone?', go: 'save' },
+          { text: 'Do you ever go in the water?', go: 'water' },
+          { text: 'Carry on, Chad.', end: true },
+        ],
+      },
+      judge: {
+        text: "Off the board. I score on splash radius, tuck, and how much of it lands on Doris. Doris has never given anyone above a three.",
+        choices: [{ text: "You're on.", set: ['chadJudge'], go: 'hub' }],
+      },
+      save: {
+        text: "Gordon. Every day. He won't get out. I've thrown him four rescue rings this week. He's using them as coasters.",
+        choices: [{ text: 'Heroic.', fx: { fun: 4 }, go: 'hub' }],
+      },
+      water: {
+        text: "Chad does not go in the water. Chad is the water's... supervisor. You don't see a manager doing the actual work, do you?",
+        choices: [{ text: "...That's fair, actually.", fx: { fun: 4, relax: 2 }, go: 'hub' }],
+      },
+    },
+  },
+
+  // --------------------------------------------------------------- DORIS
+  doris: {
+    name: 'Doris Huxley',
+    title: 'Towel strategist (retired)',
+    color: '#e0457b',
+    start: (s) => (s.flags.metDoris ? 'hub' : 'intro'),
+    nodes: {
+      intro: {
+        text: "Don't sit there. That's reserved. So is that one. And that one. And that one. Walter put the towels down at five-twelve this morning. In the dark. Like a professional.",
+        choices: [
+          { text: "Four loungers for two people?", set: ['metDoris'], go: 'four' },
+          { text: 'Good morning to you too.', set: ['metDoris'], go: 'morning' },
+        ],
+      },
+      four: {
+        text: "One for sitting, one for lying, and two for buffer. You never know who'll try to sit next to you. A talker, maybe. Someone who says 'so where are you from'.",
+        choices: [{ text: '(say nothing about where you are from)', fx: { fun: 4 }, go: 'hub' }],
+      },
+      morning: {
+        text: "It's a lovely morning. For those of us who secured our position. Walter, say good morning.",
+        choices: [{ text: '(Walt, from behind her: "Yes, dear.")', fx: { fun: 5 }, go: 'hub' }],
+      },
+      hub: {
+        text: (s, g) =>
+          s.flags.towelPeace
+            ? pick(g, 'dorisPeace', [
+                "Your lounger's still warm from yesterday. Walter checked. With his hand. I didn't ask him to.",
+                "We're on very good terms now, you and I. Don't push it.",
+              ])
+            : pick(g, 'dorisHub', [
+                "A man tried to move one of our towels at eleven. Walter stared at him until he left. Walter is very good at staring.",
+                "Thirty-one years of marriage and four sun loungers. That's the secret. Space.",
+                "I don't swim. I supervise the pool from a horizontal position.",
+              ]),
+        choices: [
+          { text: "Brenda from Ohio reserves her loungers at five o'clock, you know.", if: (s) => s.flags.metBrenda && !s.flags.towelWar, set: ['towelWar'], go: 'war' },
+          { text: 'What if you just... shared one?', if: (s) => !s.flags.towelPeace, go: 'share' },
+          { text: "I'll leave you to your empire.", end: true },
+        ],
+      },
+      war: {
+        text: "...Five. Five o'clock. She turns slowly to her husband. 'Walter. Set the alarm for four-thirty.' 'Yes, dear.' She looks back at you with the eyes of a general. 'Thank you for the intelligence.'",
+        choices: [
+          {
+            text: '(back away slowly)',
+            fx: { fun: 10 },
+            act: (g) => g.memory('towel_war', 'Accidentally escalated the Great Towel War between Doris and Brenda. Alarms are now set for 4:30 am.'),
+            end: true,
+          },
+        ],
+      },
+      share: {
+        text: "Share? ...With whom? 'With me.' She looks you up and down for a very long time. Then she slides a towel off the end lounger and folds it into a perfect square. 'Fifteen minutes. Walter will time you.'",
+        choices: [
+          {
+            text: 'Thank you, Doris.',
+            set: ['towelPeace'],
+            fx: { relax: 10, fun: 6 },
+            act: (g) => g.memory('towel_peace', 'Doris let you use one of her reserved loungers. For fifteen minutes. Walter timed it.'),
+            end: true,
+          },
+        ],
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------- WALT
+  walt: {
+    name: 'Walt Huxley',
+    title: 'Husband',
+    color: '#7a6a4f',
+    start: () => 'hello',
+    nodes: {
+      hello: {
+        text: 'Yes, dear.',
+        choices: [
+          { text: "...I'm not Doris.", go: 'notdoris' },
+          { text: 'Nice safari vest.', go: 'vest' },
+          { text: 'Are you enjoying your holiday, Walt?', go: 'holiday' },
+        ],
+      },
+      notdoris: {
+        text: "He looks around, slowly, the way a meerkat checks for eagles. '...Yes, dear.'",
+        choices: [{ text: 'Right.', fx: { fun: 4 }, end: true }],
+      },
+      vest: {
+        text: "He pats one of its fourteen pockets. There's a whistle in it, a compass, a tin of mints and a laminated map of the pool. 'Yes, dear,' he says, with something like pride.",
+        choices: [{ text: '(nod respectfully)', fx: { fun: 4 }, end: true }],
+      },
+      holiday: {
+        text: (s) =>
+          s.memories.some((m) => m.id === 'walt')
+            ? "He gives you the smallest nod. A man who has said too much once already."
+            : "He glances at Doris. She's re-folding a towel. He leans in and whispers: 'I have been on safari in four countries. I have faced down a charging rhinoceros. Nothing prepared me for five a.m. towel duty.' From the lounger: 'WALTER.' He straightens. 'Yes, dear.'",
+        choices: [
+          {
+            text: '(keep his secret)',
+            fx: { fun: 8 },
+            act: (g) => g.memory('walt', 'Heard Walt Huxley say a full sentence. Possibly his first in years. It was about a rhinoceros.'),
+            end: true,
+          },
+        ],
+      },
+    },
+  },
+
+  // -------------------------------------------------------------- GORDON
+  gordon: {
+    name: 'Gordon Pratt',
+    title: 'Has not left the pool since Tuesday',
+    color: '#1f6fb2',
+    start: (s) => (s.flags.metGordon ? 'hub' : 'intro'),
+    nodes: {
+      intro: {
+        text: "Ah! A visitor! Come in, come in, the water's lovely. I'd know. I've been in it since Tuesday.",
+        choices: [
+          { text: 'Since TUESDAY?', set: ['metGordon'], go: 'tuesday' },
+          { text: "Is that a Hawaiian shirt? In the pool?", set: ['metGordon'], go: 'shirt' },
+        ],
+      },
+      tuesday: {
+        text: "I came in for a quick dip. Then a waiter started bringing drinks to the edge. Then I thought: why would I ever leave? My fingers are permanently pruned. I've reached a new state of being.",
+        choices: [{ text: "Don't you have to get out sometimes?", go: 'out' }],
+      },
+      shirt: {
+        text: "It's my swimming shirt. It's also my dinner shirt, my sleeping shirt and, technically, my towel. Very versatile garment. Very wet.",
+        choices: [{ text: 'And how long have you been in?', go: 'tuesday' }],
+      },
+      out: {
+        text: "Chad keeps asking me that. I tell him what I tell my wife on the phone: 'Sorry, can't talk, I'm in a meeting.' It's a pool meeting. Very productive. We've decided nothing.",
+        choices: [{ text: 'Respect.', fx: { fun: 6 }, go: 'hub' }],
+      },
+      hub: {
+        text: (s, g) =>
+          pick(g, 'gordonHub', [
+            "Every problem in life can be solved by standing in water up to your chest. I've tested this extensively.",
+            "There's a dolphin in the bay who keeps telling me to 'get out more'. Rich, coming from a dolphin.",
+            "Doris gave my cannonball a two. I wasn't even doing a cannonball. I'd just sat down.",
+            "If you see my wife, I'm in a meeting.",
+          ]),
+        choices: [
+          { text: 'Mind if I join you?', if: (s, g) => g.player.swimming || (g.pool && g.pool.inPool(g.player.pos.x, g.player.pos.z)), go: 'join' },
+          { text: 'Mind if I join you?', if: (s, g) => !(g.player.swimming || (g.pool && g.pool.inPool(g.player.pos.x, g.player.pos.z))), go: 'hopin' },
+          { text: 'Have you tried the slide?', go: 'slide' },
+          { text: 'Enjoy your meeting, Gordon.', end: true },
+        ],
+      },
+      hopin: {
+        text: "Hop in first! The steps are at this end. Mind Chad, he's very strict about... everything.",
+        choices: [{ text: 'Will do.', go: 'hub' }],
+      },
+      join: {
+        text: "You lean on the edge next to Gordon. He offers you a sip of something orange with an umbrella in it. Together you watch the light wobble on the bottom of the pool and say absolutely nothing useful for a long, long time.",
+        choices: [
+          {
+            text: 'Ahhh.',
+            act: (g) => {
+              const m = g.mult('gordon');
+              g.fx({ relax: 18 * m, fun: 6 * m });
+              g.memory('gordon', 'Spent a lazy hour in the pool with Gordon, who has not left it since Tuesday. You understand him now.');
+            },
+            end: true,
+          },
+        ],
+      },
+      slide: {
+        text: "Once. Wonderful. Terrifying. I came out of the bottom and simply never left. That was the Tuesday.",
+        choices: [{ text: 'Ah.', fx: { fun: 4 }, go: 'hub' }],
+      },
+    },
+  },
+
   // --------------------------------------------------------------- PHONE
   phone: {
     name: 'Your Phone',

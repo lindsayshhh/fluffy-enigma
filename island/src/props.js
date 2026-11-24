@@ -323,7 +323,7 @@ function loungerMaterials(colour) {
 
 // A lounger at the origin of `parent`, backrest toward +z, `length` metres
 // long. Returns false if the scanned model isn't available.
-function placeLounger(parent, x, y, z, colour, length = 2.0) {
+export function placeLounger(parent, x, y, z, colour, length = 2.0) {
   const L = scannedLounger();
   if (!L) return false;
   const mats = loungerMaterials(colour);
@@ -628,6 +628,7 @@ export class World {
       { x: L.kayak.x, z: L.kayak.z, r: 5 },
       { x: L.bonfire.x, z: L.bonfire.z, r: 7 },
       { x: L.cove.x, z: L.cove.z, r: 6 },
+      ...(L.pool ? [{ x: L.pool.x, z: L.pool.z, r: 23 }] : []),
     ];
 
     this.buildPalms();

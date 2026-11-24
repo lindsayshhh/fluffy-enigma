@@ -45,6 +45,10 @@ Play it on a computer with a mouse and keyboard, with sound on.
 - **Fishing**: at the end of the dock, from 6 am to 8 pm. Strike with `Space` when the bobber dips. The sea gives up some odd things, and at least one of them belongs to somebody.
 - **The last night**: on day 3 there's a bonfire on the main beach from 7:30 pm. Everyone comes, and how their evening goes depends on what you did together.
 
+### The pool
+
+On a stone terrace behind the beach, between the bar and the volleyball court (stairs come up from the path). Swim in it, ride the twisting water slide, cannonball off the diving board for scores from Chad (and Doris), flop onto the inflatable flamingo, or try to get a lounger off Doris. Don't run on the deck.
+
 ### Wildlife
 
 Fiddler crabs wave their claws on the wet sand and scuttle sideways (or dive into a burrow) when you get close. Hermit crabs potter about higher up the beach and freeze if you stare. Spotted eagle rays glide over the sandy shallows, a loggerhead turtle cruises the reef, gulls circle overhead, monarch butterflies work the flowering bushes, and a pair of scarlet macaws hop between palm crowns, squawking. The journal keeps a checklist of what you've spotted, and finding all seven is a memory.
@@ -70,6 +74,9 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 - **Nana Pearl**, 84, plays beach volleyball and is undefeated since Tuesday.
 - **Skye Marlowe** is a lifestyle creator with 412 very engaged followers. She has been on the south beach for six hours and has not touched the water, only its hashtag.
 - **Reg** is a bottlenose dolphin on sabbatical from his job as Regional Sardine Coordinator (42 meetings a day). He patrols the bay west of the dock and comes over if you swim, paddle or stand at the end of the dock. Ask nicely and he'll leap, spin, or tow you round the bay.
+- **Chad Bronson** is the pool lifeguard (certified\*). \*The online course was forty minutes. He scored 91%. The other 9% was the water part.
+- **Doris Huxley** has reserved four pool loungers for two people since 5:12 am, and her husband **Walt** has said nothing but "Yes, dear" since about 1994.
+- **Gordon Pratt** has not left the pool since Tuesday. He is in a meeting.
 - **Kevin** is a seagull. Kevin wants your churro.
 
 ## Code layout
@@ -84,6 +91,7 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 | `src/layout.js` | Where everything sits, derived from the real shoreline |
 | `src/humans.js` | Realistic Rocketbox characters: loading, animation blending, head tracking, lip movement and blinking, props |
 | `src/weather.js` | Showers, wet ground, rain sound cues, the overcast veil and rainbows |
+| `src/pool.js` | The terrace pool: basin, water, slide, diving board, loungers, inflatables, and the slide and cannonball rides |
 | `src/wildlife.js` | Crabs, rays, turtle, gulls, butterflies and macaws, and the spotting checklist |
 | `src/dolphin.js` | Reg: patrolling, surfacing, coming over to talk, leaps and tow rides |
 | `src/touch.js` | On-screen joystick, drag-to-look and buttons for touch screens |

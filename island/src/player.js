@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { waveHeight } from './water.js';
 import { height } from './terrain.js';
 
-const EYE = 1.65;
+export const EYE = 1.65;
 const RADIUS = 0.32;
 const BOUNDS = 300;
 
@@ -65,6 +65,12 @@ export class Player {
     this.enabled = false;
     this.keys.clear();
     if (document.pointerLockElement) document.exitPointerLock();
+  }
+
+  // Water level here: the pool's if we're in it, otherwise the sea's.
+  surfaceAt(x, z, t) {
+    const pool = this.world.poolSurface && this.world.poolSurface(x, z);
+    return pool ?? waveHeight(x, z, t);
   }
 
   teleport(x, z, y, yaw = 0) {
@@ -137,7 +143,7 @@ export class Player {
       if (Math.hypot(nx, nz) >= BOUNDS && this.onBounds) this.onBounds();
     }
     this.world.collide(this.pos, 0.5, -1);
-    const surface = waveHeight(this.pos.x, this.pos.z, t);
+    const surface = this.surfaceAt(this.pos.x, this.pos.z, t);
     this.pos.y = surface;
     const m = this.kayak;
     m.position.set(this.pos.x, surface + 0.02, this.pos.z);
@@ -173,7 +179,7 @@ export class Player {
     if (move.lengthSq() > 1) move.normalize();
 
     const ground = this.world.groundAt(this.pos.x, this.pos.z, this.pos.y);
-    const surface = waveHeight(this.pos.x, this.pos.z, t);
+    const surface = this.surfaceAt(this.pos.x, this.pos.z, t);
     const depth = surface - ground;
     this.swimming = depth > 1.35;
     const wading = !this.swimming && ground < surface - 0.25;
@@ -196,7 +202,8 @@ export class Player {
       // Climb out onto a dock or deck.
       if (active && (k.has('Space') || this.touchJump)) {
         const p = this.world.platformNear(this.pos.x, this.pos.z, 0.9);
-        if (p && p.y < 2.3) {
+        // Low docks from the sea, or any deck just above the water (the pool).
+        if (p && (p.y < 2.3 || Math.abs(p.y - surface) < 0.6)) {
           const cx = p.r !== undefined ? p.x : THREE.MathUtils.clamp(this.pos.x, p.x0 + 0.5, p.x1 - 0.5);
           const cz = p.r !== undefined ? p.z : THREE.MathUtils.clamp(this.pos.z, p.z0 + 0.5, p.z1 - 0.5);
           const dir = new THREE.Vector2(cx - this.pos.x, cz - this.pos.z);
@@ -261,6 +268,6 @@ export class Player {
     const roll = this.swimming ? Math.sin(t * 0.9) * 0.02 : 0;
     this.camera.rotation.set(this.pitch, this.yaw, roll, 'YXZ');
 
-    this.underwater = this.camera.position.y < waveHeight(this.camera.position.x, this.camera.position.z, t) - 0.05;
+    this.underwater = this.camera.position.y < this.surfaceAt(this.camera.position.x, this.camera.position.z, t) - 0.05;
   }
 }

@@ -60,6 +60,8 @@ export function computeLayout() {
   // Activities
   L.kayak = { x: 58, z: shoreZ(58) - 2.5 };
   L.bonfire = { x: -6, z: shoreZ(-6) - 8 };
+  // The terrace pool, on flat ground between the bar and the volleyball court.
+  L.pool = { x: -8, z: 76 };
   L.fishing = { x: L.dock.x + 3.5, z: L.dock.z1 - 1.2 };
   const coveShore = findShore(0, 0, 1, -0.42);
   const coveIn = Math.hypot(coveShore.x, coveShore.z);

@@ -3,9 +3,10 @@ textures. Reads assets/people/<Avatar>/body_color.jpg and writes
 body_beach.jpg next to it, keeping the fabric's folds and shading.
 Safe to re-run: the original texture is never modified.
 
-Usage: python3 tools/beachwear.py
+Usage: python3 tools/beachwear.py [avatar names...]
 """
 import os
+import sys
 import random
 
 import numpy as np
@@ -113,10 +114,37 @@ def pearl(img):
     return recolour(img, soft(top), hex_rgb('#10a7a2'))
 
 
-OUTFITS = {'Male_Adult_12': dez, 'Female_Adult_01': brenda, 'Male_Adult_14': captain, 'Female_Adult_14': pearl}
+def gordon(img):
+    # Tweed blazer and red jumper -> Hawaiian shirt (worn in the pool);
+    # dark trousers -> orange swim shorts.
+    r, g, b, mx, sat = channels(img)
+    skin = (r > b + 25) & (r > g + 5) & (r > 120)
+    shoes = rect(img.shape, 0.2, 0.42, 0.84, 1) | rect(img.shape, 0.58, 0.8, 0.84, 1)
+    cloth = (mx > 14) & ~skin & ~shoes
+    legs = (rect(img.shape, 0, 0.3, 0, 0.43) | rect(img.shape, 0.7, 1, 0, 0.43)) & cloth
+    shirt = cloth & ~legs & ~rect(img.shape, 0, 1, 0.84, 1)
+    img = recolour(img, soft(legs), hex_rgb('#ff8c42'))
+    return recolour(img, soft(shirt), hawaiian(img.shape[0], base='#1f6fb2', petals=('#ffd166', '#ffffff', '#ff7b54'), seed=9))
+
+
+def doris(img):
+    # Grey cardigan -> hot-pink floral cover-up; jeans -> white capris.
+    r, g, b, mx, sat = channels(img)
+    jeans = (b > r + 12) & (mx > 25)
+    grey = (sat < 0.16) & (mx > 22) & ~jeans
+    top = grey & (rect(img.shape, 0.3, 0.7, 0.0, 0.92) | rect(img.shape, 0.0, 0.3, 0.25, 0.55) | rect(img.shape, 0.7, 1.0, 0.25, 0.55))
+    img = recolour(img, soft(jeans), hex_rgb('#f2efe7'))
+    return recolour(img, soft(top), hawaiian(img.shape[0], base='#e0457b', petals=('#fff3b0', '#ffffff', '#ffb4a2'), leaf='#2a9d8f', seed=12))
+
+
+OUTFITS = {'Male_Adult_12': dez, 'Female_Adult_01': brenda, 'Male_Adult_14': captain, 'Female_Adult_14': pearl,
+           'Male_Adult_03': gordon, 'Female_Adult_13': doris}
 
 if __name__ == '__main__':
+    only = set(sys.argv[1:])
     for name, fn in OUTFITS.items():
+        if only and name not in only:
+            continue
         src = os.path.join(ROOT, name, 'body_color.jpg')
         img = np.asarray(Image.open(src).convert('RGB'))
         Image.fromarray(fn(img)).save(os.path.join(ROOT, name, 'body_beach.jpg'), 'JPEG', quality=86, optimize=True)
