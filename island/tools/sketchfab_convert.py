@@ -39,6 +39,26 @@ def convert(src, out, max_size=1024, drop=()):
         if 'mesh' in node and doc['meshes'][node['mesh']].get('name', '') in drop:
             del node['mesh']
 
+    # three.js no longer reads the old specular-glossiness materials, so
+    # translate them to metal-rough (diffuse becomes base colour).
+    for m in doc.get('materials', []):
+        sg = m.get('extensions', {}).pop('KHR_materials_pbrSpecularGlossiness', None)
+        if sg is None:
+            continue
+        pbr = m.setdefault('pbrMetallicRoughness', {})
+        if 'diffuseTexture' in sg:
+            pbr['baseColorTexture'] = sg['diffuseTexture']
+        if 'diffuseFactor' in sg:
+            pbr['baseColorFactor'] = sg['diffuseFactor']
+        pbr['metallicFactor'] = 0
+        pbr['roughnessFactor'] = round(1 - sg.get('glossinessFactor', 0.5), 3)
+        if not m['extensions']:
+            del m['extensions']
+    if 'extensionsUsed' in doc:
+        doc['extensionsUsed'] = [e for e in doc['extensionsUsed'] if e != 'KHR_materials_pbrSpecularGlossiness']
+    if 'extensionsRequired' in doc:
+        doc['extensionsRequired'] = [e for e in doc['extensionsRequired'] if e != 'KHR_materials_pbrSpecularGlossiness']
+
     image_views = set()
     for i, im in enumerate(doc.get('images', [])):
         bv = doc['bufferViews'][im['bufferView']]

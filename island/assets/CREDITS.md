@@ -44,7 +44,7 @@ Textures were downsized from 2K TGA to 1K JPEG/PNG with `tools/rocketbox_texture
 | Nana Pearl | Female_Adult_14 |
 | Beachgoers | Sports_Female_01, Sports_Male_01, Female_Party_01 |
 
-## Palms, plants, loungers and Reg (`sketchfab/`)
+## Palms, plants, loungers and animals (`sketchfab/`)
 
 These models come from [Sketchfab](https://sketchfab.com) under the [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/) licence (CC BY 4.0). They were converted with `tools/sketchfab_convert.py`: textures downsized to 512–1024 px and the geometry repackaged as glTF JSON. In the game they are split into individual plants, rescaled and given wind sway.
 
@@ -55,3 +55,10 @@ These models come from [Sketchfab](https://sketchfab.com) under the [Creative Co
 | `tropical_plants` | ["Tropical Plants Pack M02P"](https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0) | MozzarellaARC |
 | `lounger` | ["teak sun lounger"](https://sketchfab.com/3d-models/teak-sun-lounger-a150189e9a92485897ed2dcfc1856c17) | nonsenseblve (modified: split into frame and cushion and re-textured with wood grain and woven canvas) |
 | `dolphin` | ["Game-Ready dolphin (Swimming)"](https://sketchfab.com/3d-models/game-ready-dolphin-swimming-b621ec8894734bc79c04338edff3cd0d) | Allie2k (model and swim animation; used for Reg) |
+| `fiddler` | ["Dancing Crab - Uca Mjoebergi"](https://sketchfab.com/3d-models/dancing-crab-uca-mjoebergi-280863886fee409ab3c8168f07caa89f) | Bohdan Lvov (ground plane removed; materials converted to metal-rough) |
+| `hermit` | ["Hermit Crab"](https://sketchfab.com/3d-models/hermit-crab-7e71ce922fd44ab8b9221737e9618361) | kenchoo |
+| `turtle` | ["Loggerhead Turtle"](https://sketchfab.com/3d-models/loggerhead-turtle-42aaed2a8085424b9aeaa3f3394eeb3a) | Ra_in_coat |
+| `ray` | ["Eagle stingray"](https://sketchfab.com/3d-models/eagle-stingray-4d615971858940f38703a1f1ffb370be) | kenchoo |
+| `gulls` | ["Seagulls animated"](https://sketchfab.com/3d-models/seagulls-animated-73aed843190a4dfda55f2b65cc0f8d63) | vicente betoret ferrero |
+| `butterfly` | ["Animated Flying Fluttering Butterfly Loop"](https://sketchfab.com/3d-models/animated-flying-fluttering-butterfly-loop-80f8d9a6dadc411e89ca366cb0cfb0d9) | LasquetiSpice (materials converted to metal-rough) |
+| `macaw` | ["Scarlet Macaw"](https://sketchfab.com/3d-models/scarlet-macaw-0bb61160866b4811bd79b6d11e3d8907) | Mateus Schwaab |

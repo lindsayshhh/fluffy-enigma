@@ -2,7 +2,7 @@
 
 A first-person vacation game. You're a guest on a small tropical island for three days. Your goal is to have as much **fun** and be as **relaxed** as possible before the boat leaves, with help from the island's residents (and despite one seagull).
 
-It runs in the browser on [three.js](https://threejs.org/), with no build step. The island, palms, water and sound are generated in code; surfaces and a few props use photoscanned textures and models from [Poly Haven](https://polyhaven.com) (CC0), and the characters are realistic, motion-captured avatars from the [Microsoft Rocketbox library](https://github.com/microsoft/Microsoft-Rocketbox) (MIT). The palms, tropical plants, sun loungers and Reg the dolphin are Sketchfab models by Next Spring, evolveduk, MozzarellaARC, nonsenseblve and Allie2k (CC BY 4.0). See [`assets/CREDITS.md`](assets/CREDITS.md). If any of those files are missing, the game falls back to its procedural look.
+It runs in the browser on [three.js](https://threejs.org/), with no build step. The island, palms, water and sound are generated in code; surfaces and a few props use photoscanned textures and models from [Poly Haven](https://polyhaven.com) (CC0), and the characters are realistic, motion-captured avatars from the [Microsoft Rocketbox library](https://github.com/microsoft/Microsoft-Rocketbox) (MIT). The palms, tropical plants, sun loungers, Reg the dolphin and the wildlife are Sketchfab models by Next Spring, evolveduk, MozzarellaARC, nonsenseblve, Allie2k, Bohdan Lvov, kenchoo, Ra_in_coat, vicente betoret ferrero, LasquetiSpice and Mateus Schwaab (CC BY 4.0). See [`assets/CREDITS.md`](assets/CREDITS.md). If any of those files are missing, the game falls back to its procedural look.
 
 ## Run it
 
@@ -45,6 +45,10 @@ Play it on a computer with a mouse and keyboard, with sound on.
 - **Fishing**: at the end of the dock, from 6 am to 8 pm. Strike with `Space` when the bobber dips. The sea gives up some odd things, and at least one of them belongs to somebody.
 - **The last night**: on day 3 there's a bonfire on the main beach from 7:30 pm. Everyone comes, and how their evening goes depends on what you did together.
 
+### Wildlife
+
+Fiddler crabs wave their claws on the wet sand and scuttle sideways (or dive into a burrow) when you get close. Hermit crabs potter about higher up the beach and freeze if you stare. Spotted eagle rays glide over the sandy shallows, a loggerhead turtle cruises the reef, gulls circle overhead, monarch butterflies work the flowering bushes, and a pair of scarlet macaws hop between palm crowns, squawking. The journal keeps a checklist of what you've spotted, and finding all seven is a memory.
+
 ### Weather and nights
 
 - Tropical showers roll in a few times over the trip: the sky goes grey, the sand turns dark and glossy, and everyone runs for the bar. Late-afternoon showers leave a rainbow behind (rainbows need the sun below 42°, as in real life). The last evening is always clear.
@@ -80,6 +84,7 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 | `src/layout.js` | Where everything sits, derived from the real shoreline |
 | `src/humans.js` | Realistic Rocketbox characters: loading, animation blending, head tracking, lip movement and blinking, props |
 | `src/weather.js` | Showers, wet ground, rain sound cues, the overcast veil and rainbows |
+| `src/wildlife.js` | Crabs, rays, turtle, gulls, butterflies and macaws, and the spotting checklist |
 | `src/dolphin.js` | Reg: patrolling, surfacing, coming over to talk, leaps and tow rides |
 | `src/touch.js` | On-screen joystick, drag-to-look and buttons for touch screens |
 | `src/post.js` | Post-processing: ambient occlusion, bloom, depth of field in conversations, colour grade, vignette, film grain |

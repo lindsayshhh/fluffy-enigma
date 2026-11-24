@@ -268,6 +268,14 @@ export class Audio {
     [110, 164.8, 220.5, 296, 391].forEach((f, i) => this.tone(f, 5 - i * 0.6, { vol: 0.12 / (i + 1), attack: 0.01 }));
   }
 
+  // A macaw's harsh two-note squawk.
+  macaw() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.tone(1400, 0.16, { type: 'sawtooth', vol: 0.035, at: t, slide: 800, dest: this.master });
+    this.tone(1250, 0.2, { type: 'sawtooth', vol: 0.03, at: t + 0.2, slide: 650, dest: this.master });
+  }
+
   // Dolphin chatter: quick high clicks with the odd whistle.
   dolphin() {
     if (!this.ctx) return;

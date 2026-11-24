@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SPECIES } from './wildlife.js';
 import { CHARACTERS } from './dialogue.js';
 import { height, findShore } from './terrain.js';
 import { smoothstep } from './noise.js';
@@ -1112,6 +1113,11 @@ export class Game {
     if (s.flags.bonfireAnnounced) add(!!s.flags.bonfireDone, 'Last night of the trip: bonfire on the main beach from 7:30 pm. Everyone will be there.');
     if (s.items.sandal) add(false, "You fished up a sandal with 'GARY' written inside. Someone might want it back.");
     if (s.items.ring) add(false, "A gold ring from Kevin's nest. Someone on this island has been missing it for a long time.");
+    {
+      const keys = Object.keys(SPECIES);
+      const seen = keys.filter((k) => s.spotted && s.spotted[k]);
+      add(seen.length === keys.length, `Wildlife spotted: ${seen.length} / ${keys.length}${seen.length ? ` (${seen.map((k) => SPECIES[k].label).join(', ')})` : ''}. Crabs on the wet sand, rays in the shallows, birds in the palms...`);
+    }
     if (f.metReg) add(s.memories.some((m) => m.id === 'reg_tow'), 'Reg the dolphin hangs around the bay west of the dock. Swim out to him and he might give you a ride.');
     if (f.metSkye) add(!!f.skyePhoneDown, 'Skye, the influencer on the south beach, has not looked up from her phone all day. Hard to lecture her while yours is buzzing.');
     if (f.skyeGoodPhoto && !f.skyeSunset) add(false, 'Skye liked your photo of her. She might want one more at golden hour (after 5 pm).');

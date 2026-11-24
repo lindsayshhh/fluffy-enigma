@@ -17,6 +17,7 @@ import { Weather } from './weather.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 import { CHARACTERS } from './dialogue.js';
 import { Dolphin } from './dolphin.js';
+import { Wildlife, SPECIES } from './wildlife.js';
 
 const TOUCH = isTouchDevice();
 if (TOUCH) document.body.classList.add('touch');
@@ -127,6 +128,11 @@ async function build() {
     assets.failed.push('characters');
   }
   setupExtras(extras);
+  try {
+    wildlife = new Wildlife(scene, assets, world, L);
+  } catch (e) {
+    console.warn('Wildlife failed to set up', e);
+  }
   if (assets.scenes.dolphin) {
     try {
       dolphin = new Dolphin(scene, assets.scenes.dolphin, assets.clips.dolphin, L);
@@ -169,6 +175,7 @@ async function build() {
   game = fresh();
   addExtraInteractions(game);
   if (dolphin) addDolphin(game);
+  if (wildlife) hookWildlife(game);
   player.teleport(L.spawn.x, L.spawn.z, world.myHut.deckY, -0.7);
 
   // Debug hooks: ?hour=17.5 starts at a given time, ?at=bar teleports.
@@ -214,7 +221,7 @@ async function build() {
     post = null;
   }
 
-  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList, dolphin: () => dolphin };
+  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList, dolphin: () => dolphin, wildlife: () => wildlife };
   requestAnimationFrame(loop);
 }
 
@@ -298,6 +305,7 @@ function loop() {
   if (started) {
     player.update(dt, t);
     game.update(dt, t);
+    if (wildlife) wildlife.update(dt, t, { player, hour: game.s.hour % 24, rain: weather.rain, camera });
     if (dolphin) {
       const talkingReg = game.talking === 'reg';
       dolphin.update(dt, t, { player, hour: game.s.hour % 24, talking: talkingReg, speaking: talkingReg && ui.typing });
@@ -427,6 +435,19 @@ function setupExtras(extras) {
     return { h, cfg };
   });
 }
+// Wildlife: a toast the first time you spot each species; a memory for all.
+let wildlife = null;
+function hookWildlife(g) {
+  wildlife.getSpotted = () => (g.s.spotted = g.s.spotted || {});
+  wildlife.onCry = (kind) => (kind === 'macaw' ? audio.macaw() : audio.gull());
+  wildlife.onSpot = (key) => {
+    ui.toast(SPECIES[key].spot, 'item');
+    g.fx({ fun: 3, relax: 3 });
+    const seen = Object.keys(g.s.spotted).filter((k) => SPECIES[k]).length;
+    if (seen >= Object.keys(SPECIES).length) g.memory('naturalist', 'Spotted every kind of wildlife on Palmera Cay, from fiddler crabs to macaws. David Attenborough would be proud. Or at least polite.');
+  };
+}
+
 // Reg the dolphin: talkable when he's come over and is waiting at the surface.
 let dolphin = null;
 let lastClick = 0;

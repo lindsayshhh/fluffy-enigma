@@ -612,6 +612,8 @@ export class World {
     this.lights = [];
     this.torches = [];
     this.coconutPalms = [];
+    this.palmCrowns = [];
+    this.bushSpots = [];
     this.shells = [];
     this.exclude = [
       { x: L.bar.x, z: L.bar.z, r: 14 },
@@ -786,6 +788,7 @@ export class World {
           this.shade.push({ x: p.x + crown.x, z: p.z + crown.z, r: 3.4 * p.scale });
           this.colliders.push({ x: p.x, z: p.z, r: 0.38 });
           if (p.grove) this.coconutPalms.push({ x: p.x, z: p.z, y: p.y, top: p.y + crown.y, cx: p.x + crown.x, cz: p.z + crown.z, nuts: 3 });
+          this.palmCrowns.push({ x: p.x + crown.x, y: p.y + crown.y, z: p.z + crown.z });
         });
         for (const m of meshes) {
           m.castShadow = true;
@@ -810,6 +813,7 @@ export class World {
         this.shade.push({ x: p.x + crown.x, z: p.z + crown.z, r: 3.4 * p.scale });
         this.colliders.push({ x: p.x, z: p.z, r: 0.38 });
         if (p.grove) this.coconutPalms.push({ x: p.x, z: p.z, y: p.y, top: p.y + crown.y, cx: p.x + crown.x, cz: p.z + crown.z, nuts: 3 });
+        this.palmCrowns.push({ x: p.x + crown.x, y: p.y + crown.y, z: p.z + crown.z });
       });
       for (const m of [trunk, fronds, nuts]) {
         if (!m) continue;
@@ -880,6 +884,7 @@ export class World {
         if (pathDistance(x, z, this.L.paths) < 2.2) continue;
         bushes.push({ x, z, y: h - 0.1, s: 0.8 + r() * 0.8, a: r() * 6.28 });
       }
+      this.bushSpots = bushes;
       const total = plants.reduce((t, v) => t + v.weight, 0);
       const lists = plants.map(() => []);
       for (const b of bushes) {
@@ -908,6 +913,7 @@ export class World {
       return;
     }
 
+    this.bushSpots = bushes;
     const bm = new THREE.InstancedMesh(bushGeo, MAT.bush, bushes.length);
     const flowers = [];
     bushes.forEach((b, i) => {
