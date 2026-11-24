@@ -114,31 +114,88 @@ def pearl(img):
     return recolour(img, soft(top), hex_rgb('#10a7a2'))
 
 
+def bare_skin(img, mask, sample):
+    """Paint `mask` as bare skin, matching the avatar's own skin tone (taken
+    from the `sample` area, e.g. the hands) with soft shading and a little
+    grain. Returns the image and the painted mask (for flattening normals)."""
+    r, g, b, mx, sat = channels(img)
+    is_skin = sample & (r > b + 25) & (r > g + 5) & (r > 110)
+    tone = np.median(img[is_skin].astype(float), axis=0) / 255
+    lum = np.asarray(Image.fromarray(img).convert('L').filter(ImageFilter.GaussianBlur(6)), float)
+    m = mask > 0.5
+    rel = (lum / max(lum[m].mean(), 1) - 1) * 0.25 + 1
+    noise = np.random.default_rng(3).normal(0, 0.012, img.shape[:2])
+    paint = np.clip(tone[None, None, :] * (rel + noise)[..., None], 0, 1)
+    a = mask[..., None]
+    out = img.astype(float) / 255 * (1 - a) + paint * a
+    return (out * 255).astype(np.uint8), mask
+
+
 def gordon(img):
     # Tweed blazer and red jumper -> Hawaiian shirt (worn in the pool);
-    # dark trousers -> orange swim shorts.
+    # trousers -> orange board shorts above the knee, bare legs below.
     r, g, b, mx, sat = channels(img)
     skin = (r > b + 25) & (r > g + 5) & (r > 120)
     shoes = rect(img.shape, 0.2, 0.42, 0.84, 1) | rect(img.shape, 0.58, 0.8, 0.84, 1)
     cloth = (mx > 14) & ~skin & ~shoes
-    legs = (rect(img.shape, 0, 0.3, 0, 0.43) | rect(img.shape, 0.7, 1, 0, 0.43)) & cloth
+    leg_area = rect(img.shape, 0, 0.3, 0, 0.45) | rect(img.shape, 0.7, 1, 0, 0.45)
+    legs = leg_area & cloth
+    shorts = legs & rect(img.shape, 0, 1, 0, 0.235)
+    shins = legs & ~shorts
     shirt = cloth & ~legs & ~rect(img.shape, 0, 1, 0.84, 1)
-    img = recolour(img, soft(legs), hex_rgb('#ff8c42'))
-    return recolour(img, soft(shirt), hawaiian(img.shape[0], base='#1f6fb2', petals=('#ffd166', '#ffffff', '#ff7b54'), seed=9))
+    img = recolour(img, soft(shorts), hawaiian(img.shape[0], base='#ff8c42', petals=('#fff3b0', '#ffffff', '#3a86ff'), leaf='#ffbe0b', seed=21))
+    img = recolour(img, soft(shirt), hawaiian(img.shape[0], base='#1f6fb2', petals=('#ffd166', '#ffffff', '#ff7b54'), seed=9))
+    return bare_skin(img, soft(shins), rect(img.shape, 0, 1, 0.84, 1))
 
 
 def doris(img):
-    # Grey cardigan -> hot-pink floral cover-up; jeans -> white capris.
+    # Grey cardigan -> hot-pink floral top; jeans -> white shorts, bare legs.
     r, g, b, mx, sat = channels(img)
     jeans = (b > r + 12) & (mx > 25)
     grey = (sat < 0.16) & (mx > 22) & ~jeans
     top = grey & (rect(img.shape, 0.3, 0.7, 0.0, 0.92) | rect(img.shape, 0.0, 0.3, 0.25, 0.55) | rect(img.shape, 0.7, 1.0, 0.25, 0.55))
-    img = recolour(img, soft(jeans), hex_rgb('#f2efe7'))
-    return recolour(img, soft(top), hawaiian(img.shape[0], base='#e0457b', petals=('#fff3b0', '#ffffff', '#ffb4a2'), leaf='#2a9d8f', seed=12))
+    leg_area = rect(img.shape, 0, 0.3, 0.55, 1) | rect(img.shape, 0.7, 1, 0.55, 1)
+    shorts = jeans & leg_area & rect(img.shape, 0, 1, 0, 0.74)
+    shins = (jeans | ((mx > 20) & (mx < 90))) & leg_area & rect(img.shape, 0, 1, 0.74, 1)
+    img = recolour(img, soft(shorts), hex_rgb('#f7f4ec'))
+    # Her black shoes sit beside the top in the texture.
+    sandals = (rect(img.shape, 0.17, 0.31, 0, 0.3) | rect(img.shape, 0.69, 0.83, 0, 0.3)) & (mx > 8) & ~((r > b + 25) & (r > g + 5) & (r > 110))
+    img = recolour(img, soft(sandals), hex_rgb('#c8a165'))
+    img = recolour(img, soft(top), hawaiian(img.shape[0], base='#e0457b', petals=('#fff3b0', '#ffffff', '#ffb4a2'), leaf='#2a9d8f', seed=12))
+    return bare_skin(img, soft(shins), rect(img.shape, 0, 0.3, 0, 0.25) | rect(img.shape, 0.7, 1, 0, 0.25))
+
+
+def walt(img):
+    # Safari vest and field shirt -> loud parrot-coloured holiday shirt;
+    # trousers -> khaki shorts; white socks with brown sandals. A classic.
+    # (The khaki vest is skin-coloured, so only count the hands as skin.)
+    r, g, b, mx, sat = channels(img)
+    skin = (r > b + 25) & (r > g + 5) & (r > 120) & rect(img.shape, 0, 1, 0.84, 1)
+    shoes = rect(img.shape, 0.2, 0.42, 0.84, 1) | rect(img.shape, 0.58, 0.8, 0.84, 1)
+    cloth = (mx > 14) & ~skin & ~shoes
+    leg_area = rect(img.shape, 0, 0.3, 0, 0.45) | rect(img.shape, 0.7, 1, 0, 0.45)
+    legs = leg_area & cloth
+    shorts = legs & rect(img.shape, 0, 1, 0, 0.235)
+    socks = legs & rect(img.shape, 0, 1, 0.36, 0.45)
+    shins = legs & ~shorts & ~socks
+    shirt = cloth & ~legs & ~rect(img.shape, 0, 1, 0.84, 1)
+    img = recolour(img, soft(shorts), hex_rgb('#cdb68a'))
+    img = recolour(img, soft(socks), hex_rgb('#fbfbf7'))
+    img = recolour(img, soft(shoes & (mx > 14)), hex_rgb('#6b4226'))
+    img = recolour(img, soft(shirt), hawaiian(img.shape[0], base='#00a6a6', petals=('#ff595e', '#ffca3a', '#ffffff'), leaf='#1b5e20', seed=31))
+    return bare_skin(img, soft(shins), rect(img.shape, 0, 1, 0.84, 1))
+
+
+def chad(img):
+    # Black swim trunks -> classic red lifeguard trunks.
+    r, g, b, mx, sat = channels(img)
+    skin = (r > b + 25) & (r > g + 5) & (r > 110)
+    trunks = (rect(img.shape, 0, 0.3, 0, 0.13) | rect(img.shape, 0.7, 1, 0, 0.13)) & ~skin & (mx > 5)
+    return recolour(img, soft(trunks), hex_rgb('#d62828'))
 
 
 OUTFITS = {'Male_Adult_12': dez, 'Female_Adult_01': brenda, 'Male_Adult_14': captain, 'Female_Adult_14': pearl,
-           'Male_Adult_03': gordon, 'Female_Adult_13': doris}
+           'Male_Adult_03': gordon, 'Female_Adult_13': doris, 'Male_Adult_05': walt, 'Sports_Male_01': chad}
 
 if __name__ == '__main__':
     only = set(sys.argv[1:])
@@ -147,5 +204,16 @@ if __name__ == '__main__':
             continue
         src = os.path.join(ROOT, name, 'body_color.jpg')
         img = np.asarray(Image.open(src).convert('RGB'))
-        Image.fromarray(fn(img)).save(os.path.join(ROOT, name, 'body_beach.jpg'), 'JPEG', quality=86, optimize=True)
+        out = fn(img)
+        bare = None
+        if isinstance(out, tuple):
+            out, bare = out
+        Image.fromarray(out).save(os.path.join(ROOT, name, 'body_beach.jpg'), 'JPEG', quality=86, optimize=True)
+        if bare is not None:
+            # Bare skin shouldn't keep the trousers' creases: flatten the normals there.
+            nrm = np.asarray(Image.open(os.path.join(ROOT, name, 'body_normal.jpg')).convert('RGB'), float)
+            flat = np.array([128, 128, 255], float)
+            a = (bare * 0.85)[..., None]
+            nrm = nrm * (1 - a) + flat * a
+            Image.fromarray(nrm.astype(np.uint8)).save(os.path.join(ROOT, name, 'body_beach_normal.jpg'), 'JPEG', quality=88, optimize=True)
         print(name, 'done')

@@ -18,12 +18,12 @@ export const CASTING = {
 };
 export const EXTRAS = [
   { avatar: 'Sports_Female_01', sex: 'f', idle: 'f_calm', key: 'skye', selfie: true },
-  { avatar: 'Sports_Male_01', sex: 'm', idle: 'm_look', key: 'chad', hat: 'visor' },
+  { avatar: 'Sports_Male_01', sex: 'm', idle: 'm_look', key: 'chad', hat: 'visor', beachwear: true },
   { avatar: 'Female_Party_01', sex: 'f', idle: 'f_calm', evening: 'f_dance' },
   // The pool crowd.
   { avatar: 'Male_Adult_03', sex: 'm', idle: 'm_breathe', key: 'gordon', beachwear: true, drink: true },
   { avatar: 'Female_Adult_13', sex: 'f', idle: 'f_nervous', key: 'doris', beachwear: true, hat: 'sunhat' },
-  { avatar: 'Male_Adult_05', sex: 'm', idle: 'm_idle', key: 'walt' },
+  { avatar: 'Male_Adult_05', sex: 'm', idle: 'm_idle', key: 'walt', beachwear: true },
 ];
 
 // Binary data ships as base64 inside JSON so any static host will serve it.
@@ -108,7 +108,8 @@ async function loadAvatar(name, texLoader, fbxLoader, beachwear = false) {
   });
   const [bodyC, bodyN, headC, headN, opacity] = await Promise.all([
     (beachwear ? tex('body_beach.jpg', true) : Promise.resolve(null)).then((t) => t || tex('body_color.jpg', true)),
-    tex('body_normal.jpg'),
+    // Outfits that bare the legs come with smoothed normals for the skin.
+    (beachwear ? tex('body_beach_normal.jpg') : Promise.resolve(null)).then((t) => t || tex('body_normal.jpg')),
     tex('head_color.jpg', true),
     tex('head_normal.jpg'),
     hasOpacity ? tex('opacity.png', true) : null,
