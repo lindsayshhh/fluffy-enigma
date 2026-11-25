@@ -590,11 +590,13 @@ export class Pool {
       new THREE.Vector3(sxp(15.6), d + 4.0, Z(6.5)),
       new THREE.Vector3(sxp(15.4), d + 3.5, Z(3)),
       new THREE.Vector3(sxp(14.2), d + 3.0, Z(0)),
-      new THREE.Vector3(sxp(15.6), d + 2.4, Z(-3)),
-      new THREE.Vector3(sxp(14.8), d + 1.8, Z(-5.4)),
-      new THREE.Vector3(sxp(12.2), d + 1.0, Z(-5.6)),
-      new THREE.Vector3(sxp(10.3), d + 0.55, Z(-4.6)),
-      new THREE.Vector3(sxp(8.6), this.surface + 0.25, Z(-4.2)),
+      new THREE.Vector3(sxp(15.6), d + 2.5, Z(-3)),
+      new THREE.Vector3(sxp(14.8), d + 2.0, Z(-5.4)),
+      new THREE.Vector3(sxp(12.4), d + 1.5, Z(-5.6)),
+      new THREE.Vector3(sxp(10.8), d + 1.15, Z(-4.9)),
+      // Stay high until clear of the pool edge, then drop to the water.
+      new THREE.Vector3(sxp(9.2), d + 0.7, Z(-4.4)),
+      new THREE.Vector3(sxp(7.6), this.surface + 0.25, Z(-4.1)),
     ];
     this.slide = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.4);
     const slideMat = new THREE.MeshPhysicalMaterial({ color: 0x1a9fdb, roughness: 0.25, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08, side: THREE.DoubleSide });

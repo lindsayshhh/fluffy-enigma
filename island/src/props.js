@@ -1561,11 +1561,45 @@ export class World {
     this.scene.add(net);
     this.box(9.6, 0.06, 0.03, MAT.white, V.x, g + 2.5, V.z);
     // Court boundary ropes
-    const ropeMat = new THREE.MeshStandardMaterial({ color: 0x1d4e89 });
-    for (const [w, d, dx, dz] of [[9, 0.05, 0, 9], [9, 0.05, 0, -9], [0.05, 18, 4.5, 0], [0.05, 18, -4.5, 0]]) {
-      const m = this.box(w, 0.03, d, ropeMat, V.x + dx, 0, V.z + dz);
-      m.position.y = height(V.x + dx, V.z + dz) + 0.02;
-      m.castShadow = false;
+    // Court boundary tape, laid on the sand: sampled every 25 cm so it
+    // follows the slope of the beach instead of floating or sinking.
+    const tape = (x0, z0, x1, z1, w = 0.06) => {
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      const n = Math.ceil(len / 0.25);
+      const nx = -(z1 - z0) / len * (w / 2);
+      const nz = (x1 - x0) / len * (w / 2);
+      const pos = [];
+      const idx = [];
+      for (let i = 0; i <= n; i++) {
+        const x = x0 + ((x1 - x0) * i) / n;
+        const z = z0 + ((z1 - z0) * i) / n;
+        for (const sgn of [-1, 1]) {
+          const px = x + nx * sgn;
+          const pz = z + nz * sgn;
+          pos.push(px, height(px, pz) + 0.03, pz);
+        }
+        if (i < n) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      return geo;
+    };
+    const hx = 4.5;
+    const hz = 9;
+    const lines = [
+      tape(V.x - hx, V.z - hz, V.x + hx, V.z - hz),
+      tape(V.x + hx, V.z + hz, V.x - hx, V.z + hz),
+      tape(V.x + hx, V.z - hz, V.x + hx, V.z + hz),
+      tape(V.x - hx, V.z + hz, V.x - hx, V.z - hz),
+    ];
+    const court = new THREE.Mesh(mergeGeometries(lines), new THREE.MeshStandardMaterial({ color: 0x1d4e89, roughness: 0.8, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 }));
+    court.receiveShadow = true;
+    this.scene.add(court);
+    // Little corner anchors, where the tape is pegged into the sand.
+    for (const [cx, cz] of [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]]) {
+      this.cyl(0.035, 0.035, 0.06, MAT.white, V.x + cx, height(V.x + cx, V.z + cz) + 0.02, V.z + cz, null, 8);
     }
     const ballMat = new THREE.MeshStandardMaterial({ map: T.stripeTexture(['#ffd23f', '#ffffff', '#1d4e89'], 6), roughness: 0.6 });
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), ballMat);
