@@ -49,7 +49,7 @@ Textures were downsized from 2K TGA to 1K JPEG/PNG with `tools/rocketbox_texture
 | Walt Huxley | Male_Adult_05 (recoloured: holiday shirt, khaki shorts, socks and sandals) |
 | Beachgoer | Female_Party_01 |
 
-## Palms, plants, loungers and animals (`sketchfab/`)
+## Palms, plants, flowers, loungers and animals (`sketchfab/`)
 
 These models come from [Sketchfab](https://sketchfab.com) under the [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/) licence (CC BY 4.0). They were converted with `tools/sketchfab_convert.py`: textures downsized to 512–1024 px and the geometry repackaged as glTF JSON. In the game they are split into individual plants, rescaled and given wind sway.
 
@@ -67,3 +67,6 @@ These models come from [Sketchfab](https://sketchfab.com) under the [Creative Co
 | `gulls` | ["Seagulls animated"](https://sketchfab.com/3d-models/seagulls-animated-73aed843190a4dfda55f2b65cc0f8d63) | vicente betoret ferrero |
 | `butterfly` | ["Animated Flying Fluttering Butterfly Loop"](https://sketchfab.com/3d-models/animated-flying-fluttering-butterfly-loop-80f8d9a6dadc411e89ca366cb0cfb0d9) | LasquetiSpice (materials converted to metal-rough) |
 | `macaw` | ["Scarlet Macaw"](https://sketchfab.com/3d-models/scarlet-macaw-0bb61160866b4811bd79b6d11e3d8907) | Mateus Schwaab |
+| `hibiscus` | ["Realistic HD Chinese hibiscus (6/20)"](https://sketchfab.com/3d-models/realistic-hd-chinese-hibiscus-620-805e6e8c0dad4860970a1588827a8c5a) | PlantCatalog (petals brightened, and tinted pink for a second variety) |
+| `ixora` | ["Realistic HD Chinese jungle geranium (1/10)"](https://sketchfab.com/3d-models/realistic-hd-chinese-jungle-geranium-110-c3e52b42f2104991bc5f972cfab9c7ee) | PlantCatalog |
+| `frangipani` | ["Realistic HD Frangipani tree (16/50)"](https://sketchfab.com/3d-models/realistic-hd-frangipani-tree-1650-49d2bb670eaa44acb326de4cd517e82b) | PlantCatalog (materials converted to metal-rough) |

@@ -2,7 +2,7 @@
 
 A first-person vacation game. You're a guest on a small tropical island for three days. Your goal is to have as much **fun** and be as **relaxed** as possible before the boat leaves, with help from the island's residents (and despite one seagull).
 
-It runs in the browser on [three.js](https://threejs.org/), with no build step. The island, palms, water and sound are generated in code; surfaces and a few props use photoscanned textures and models from [Poly Haven](https://polyhaven.com) (CC0), and the characters are realistic, motion-captured avatars from the [Microsoft Rocketbox library](https://github.com/microsoft/Microsoft-Rocketbox) (MIT). The palms, tropical plants, sun loungers, Reg the dolphin and the wildlife are Sketchfab models by Next Spring, evolveduk, MozzarellaARC, nonsenseblve, Allie2k, Bohdan Lvov, kenchoo, Ra_in_coat, vicente betoret ferrero, LasquetiSpice and Mateus Schwaab (CC BY 4.0). See [`assets/CREDITS.md`](assets/CREDITS.md). If any of those files are missing, the game falls back to its procedural look.
+It runs in the browser on [three.js](https://threejs.org/), with no build step. The island, palms, water and sound are generated in code; surfaces and a few props use photoscanned textures and models from [Poly Haven](https://polyhaven.com) (CC0), and the characters are realistic, motion-captured avatars from the [Microsoft Rocketbox library](https://github.com/microsoft/Microsoft-Rocketbox) (MIT). The palms, tropical plants, sun loungers, Reg the dolphin and the wildlife are Sketchfab models by Next Spring, evolveduk, MozzarellaARC, nonsenseblve, Allie2k, Bohdan Lvov, kenchoo, Ra_in_coat, vicente betoret ferrero, LasquetiSpice, Mateus Schwaab and PlantCatalog (CC BY 4.0). See [`assets/CREDITS.md`](assets/CREDITS.md). If any of those files are missing, the game falls back to its procedural look.
 
 ## Run it
 
@@ -62,6 +62,10 @@ Press `P` (or the camera button on a touch screen) to raise your camera: the HUD
 
 The journal (`J`) has a map tab (`M`): the island drawn from the terrain, with paths, places, the people you've met where they are right now, and you.
 
+### Flowers
+
+Red and pink hibiscus, ixora and frangipani trees line the paths and fill flower beds round the bar, the bungalows, the pool, the hammock, the yoga deck and the lighthouse, with borders of pink, yellow, orange and purple flowers along every path and wildflower drifts all over the island.
+
 ### Wildlife
 
 Fiddler crabs wave their claws on the wet sand and scuttle sideways (or dive into a burrow) when you get close. Hermit crabs potter about higher up the beach and freeze if you stare. Spotted eagle rays glide over the sandy shallows, a loggerhead turtle cruises the reef, gulls circle overhead, monarch butterflies work the flowering bushes, and a pair of scarlet macaws hop between palm crowns, squawking. The journal keeps a checklist of what you've spotted, and finding all seven is a memory.
@@ -108,6 +112,7 @@ The animals load in the background after you start, so the title screen is ready
 | `src/weather.js` | Showers, wet ground, rain sound cues, the overcast veil and rainbows |
 | `src/map.js` | The island map in the journal |
 | `src/pool.js` | The terrace pool: basin, water, slide, diving board, loungers, inflatables, and the slide and cannonball rides |
+| `src/flowers.js` | Flowering shrubs and trees (drawn near the camera only) and painted flower ground cover across the island |
 | `src/wildlife.js` | Crabs, rays, turtle, gulls, butterflies and macaws, and the spotting checklist |
 | `src/dolphin.js` | Reg: patrolling, surfacing, coming over to talk, leaps and tow rides |
 | `src/touch.js` | On-screen joystick, drag-to-look and buttons for touch screens |

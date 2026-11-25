@@ -21,7 +21,7 @@ const MODELS = ['lambis_shell', 'bar_chair_round_01', 'rock_07', 'rock_09'];
 const SCENES = ['palms', 'coconut_palm', 'tropical_plants', 'lounger'];
 // Animals load in the background after the game starts (loadLateScenes),
 // so the title screen is ready sooner.
-const LATE_SCENES = ['dolphin', 'fiddler', 'hermit', 'turtle', 'ray', 'gulls', 'butterfly', 'macaw'];
+const LATE_SCENES = ['dolphin', 'fiddler', 'hermit', 'turtle', 'ray', 'gulls', 'butterfly', 'macaw', 'hibiscus', 'ixora', 'frangipani'];
 
 // `failed` lists anything that couldn't load, so the game can say so.
 export const assets = { tex: {}, models: {}, scenes: {}, clips: {}, failed: [] };

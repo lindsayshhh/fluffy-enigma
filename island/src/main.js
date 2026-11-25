@@ -20,6 +20,7 @@ import { Dolphin } from './dolphin.js';
 import { Wildlife, SPECIES } from './wildlife.js';
 import { Pool } from './pool.js';
 import { drawMap } from './map.js';
+import { Flowers } from './flowers.js';
 
 const TOUCH = isTouchDevice();
 if (TOUCH) document.body.classList.add('touch');
@@ -226,6 +227,11 @@ async function build() {
   // The animals arrive in the background once everything else is up.
   loadLateScenes().then((a) => {
     try {
+      flowers = new Flowers(scene, a, world, L, { lite: TOUCH || quality === 'low' });
+    } catch (e) {
+      console.warn('Flowers failed to set up', e);
+    }
+    try {
       wildlife = new Wildlife(scene, a, world, L, { lite: TOUCH || quality === 'low' });
       hookWildlife(game);
     } catch (e) {
@@ -241,7 +247,7 @@ async function build() {
     }
   });
 
-  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList, dolphin: () => dolphin, wildlife: () => wildlife, pool: () => pool };
+  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList, dolphin: () => dolphin, wildlife: () => wildlife, pool: () => pool, flowers: () => flowers };
   requestAnimationFrame(loop);
 }
 
@@ -441,6 +447,7 @@ function loop() {
     player.update(dt, t);
     game.update(dt, t);
     if (wildlife) wildlife.update(dt, t, { player, hour: game.s.hour % 24, rain: weather.rain, camera });
+    if (flowers) flowers.update(t, camera);
     if (pool) {
       const party = game.poolPartyActive();
       pool.setParty(party);
@@ -710,6 +717,7 @@ function checkPoolRunning(t) {
 }
 // Wildlife: a toast the first time you spot each species; a memory for all.
 let wildlife = null;
+let flowers = null;
 function hookWildlife(g) {
   wildlife.getSpotted = () => (g.s.spotted = g.s.spotted || {});
   wildlife.onCry = (kind) => (kind === 'macaw' ? audio.macaw() : audio.gull());
