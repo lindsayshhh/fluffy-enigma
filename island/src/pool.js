@@ -150,6 +150,63 @@ function travertine(seed = 3) {
   return { map, normal: heightToNormal(H, size, 1.0) };
 }
 
+// Dressed limestone blocks for the terrace walls: 80 x 40 cm stones in
+// staggered courses, each a slightly different warm cream, with recessed
+// mortar joints (the texture covers 1.6 m, the repeat used for boxes).
+function ashlar(seed = 11) {
+  const size = 512;
+  const cols = 2;
+  const rows = 4;
+  const bw = size / cols;
+  const bh = size / rows;
+  const r = seeded(seed);
+  const H = new Float32Array(size * size);
+  const map = canvasTex(size, size, (g) => {
+    g.fillStyle = '#cbbd9f';
+    g.fillRect(0, 0, size, size);
+    for (let j = 0; j < rows; j++) {
+      const off = j % 2 ? bw / 2 : 0;
+      for (let i = -1; i < cols; i++) {
+        const x0 = i * bw + off;
+        const y0 = j * bh;
+        const v = 0.9 + r() * 0.14;
+        const warm = r() * 10;
+        g.fillStyle = `rgb(${(236 * v) | 0},${((224 - warm) * v) | 0},${((198 - warm * 1.5) * v) | 0})`;
+        g.fillRect(x0 + 3, y0 + 3, bw - 6, bh - 6);
+        g.save();
+        g.beginPath();
+        g.rect(x0 + 3, y0 + 3, bw - 6, bh - 6);
+        g.clip();
+        // Fossil flecks and gentle weathering, darker toward the bottom.
+        for (let k = 0; k < 90; k++) {
+          g.fillStyle = `rgba(${r() < 0.6 ? '140,118,84' : '255,252,240'},${0.08 + r() * 0.18})`;
+          g.beginPath();
+          g.ellipse(x0 + r() * bw, y0 + r() * bh, 0.6 + r() * 2.4, 0.5 + r() * 1.4, r() * 3, 0, Math.PI * 2);
+          g.fill();
+        }
+        const grad = g.createLinearGradient(0, y0, 0, y0 + bh);
+        grad.addColorStop(0, 'rgba(255,255,255,0.06)');
+        grad.addColorStop(1, 'rgba(110,90,60,0.12)');
+        g.fillStyle = grad;
+        g.fillRect(x0, y0, bw, bh);
+        g.restore();
+      }
+    }
+  });
+  for (let y = 0; y < size; y++) {
+    const j = Math.floor(y / bh);
+    const off = j % 2 ? bw / 2 : 0;
+    const fy = y % bh;
+    for (let x = 0; x < size; x++) {
+      const fx = (x - off + size) % bw;
+      const e = Math.min(fx, fy, bw - fx, bh - fy);
+      // Slightly pillowed faces: highest in the middle of each stone.
+      H[y * size + x] = Math.min(1, Math.max(0, (e - 2) / 3)) * (0.85 + 0.15 * Math.min(1, e / 30));
+    }
+  }
+  return { map, normal: heightToNormal(H, size, 1.4) };
+}
+
 // Pool caustics: bright, thin cell borders (a tileable Voronoi F2 - F1).
 function causticTexture() {
   const N = 256;
@@ -322,9 +379,8 @@ export class Pool {
     const trav = travertine();
     const deckMat = new THREE.MeshStandardMaterial({ map: trav.map, normalMap: trav.normal, color: 0xe8e2d8, roughness: 0.72 });
     deckMat.normalScale.set(0.8, 0.8);
-    const stone =
-      texMaterial('rock_ground', { color: new THREE.Color(1.35, 1.25, 1.1), roughness: 1 }) ||
-      new THREE.MeshStandardMaterial({ color: 0xbfae8f, roughness: 0.95 });
+    const ash = ashlar();
+    const stone = new THREE.MeshStandardMaterial({ map: ash.map, normalMap: ash.normal, roughness: 0.85 });
     // Pale aqua glass mosaic for the basin, with moving caustic light on it
     // below the waterline (in world space, so it runs across floor and walls).
     this.caustics = causticTexture();
@@ -394,6 +450,46 @@ export class Pool {
     const gap = 1.8;
     box(STAIRS_X - gap - DECK.x0, wallH, T, stone, X((DECK.x0 + STAIRS_X - gap) / 2), wy, Z(DECK.z1 - T / 2));
     box(DECK.x1 - STAIRS_X - gap, wallH, T, stone, X((DECK.x1 + STAIRS_X + gap) / 2), wy, Z(DECK.z1 - T / 2));
+    // A pale stone cap along the top of the walls, overhanging a little.
+    const capY = this.deck - 0.11;
+    const capMat = new THREE.MeshStandardMaterial({ map: trav.map, normalMap: trav.normal, color: 0xf6efe2, roughness: 0.6 });
+    box(DECK.x1 - DECK.x0 + 0.24, 0.22, 0.12, capMat, X(0), capY, Z(DECK.z0 - 0.04));
+    box(0.12, 0.22, DECK.z1 - DECK.z0 + 0.24, capMat, X(DECK.x0 - 0.04), capY, Z(0));
+    box(0.12, 0.22, DECK.z1 - DECK.z0 + 0.24, capMat, X(DECK.x1 + 0.04), capY, Z(0));
+    box(STAIRS_X - gap - DECK.x0 + 0.12, 0.22, 0.12, capMat, X((DECK.x0 - 0.12 + STAIRS_X - gap) / 2), capY, Z(DECK.z1 + 0.04));
+    box(DECK.x1 - STAIRS_X - gap + 0.12, 0.22, 0.12, capMat, X((DECK.x1 + 0.12 + STAIRS_X + gap) / 2), capY, Z(DECK.z1 + 0.04));
+    // Tropical planting along the foot of the walls, to soften them.
+    this.footPlants = [];
+    const footKinds = ['Monstera', 'Fern', 'Banana', 'Fern', 'Monstera', 'Palm'];
+    const footSize = { Monstera: 1.4, Fern: 0.9, Banana: 2.8, Palm: 2.4 };
+    let fk = 0;
+    const footRun = (ax, az, bx, bz, ox, oz) => {
+      const len = Math.hypot(bx - ax, bz - az);
+      const n = Math.floor(len / 3.2);
+      for (let i = 0; i <= n; i++) {
+        const u = n ? i / n : 0.5;
+        const kind = footKinds[fk % footKinds.length];
+        // Far enough out that the leaves don't reach into the wall.
+        const out = { Fern: 1.0, Monstera: 1.4, Banana: 1.7, Palm: 2.1 }[kind] + (fk % 3) * 0.15;
+        const x = X(ax + (bx - ax) * u) + ox * out;
+        const z = Z(az + (bz - az) * u) + oz * out;
+        if (Math.abs(x - X(STAIRS_X)) < 3.4 && z > Z(DECK.z1)) {
+          fk++;
+          continue; // keep the stairs clear
+        }
+        const p = makePlant(kind, 1, fk);
+        fk++;
+        if (!p) continue;
+        p.scale.setScalar(footSize[kind] / p.userData.height);
+        p.position.set(x, height(x, z) - 0.05, z);
+        p.rotation.y = fk * 2.1;
+        grp.add(p);
+      }
+    };
+    footRun(DECK.x0 + 2.5, DECK.z1, DECK.x1 - 2.5, DECK.z1, 0, 1);
+    footRun(DECK.x1, DECK.z0 + 2.5, DECK.x1, DECK.z1 - 2.5, 1, 0);
+    footRun(DECK.x0, DECK.z0 + 2.5, DECK.x0, DECK.z1 - 2.5, -1, 0);
+    footRun(DECK.x0 + 2.5, DECK.z0, DECK.x1 - 2.5, DECK.z0, 0, -1);
     // Keep people from walking into the walls from outside.
     const wallTop = this.deck - 0.4;
     const ring = (x0, x1, z0, z1) => world.colliders.push({ x0: X(x0), x1: X(x1), z0: Z(z0), z1: Z(z1), y: wallTop });

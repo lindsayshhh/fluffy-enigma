@@ -88,17 +88,32 @@ const ShaftShader = {
     }`,
 };
 
-// Ambient occlusion that ignores the (transparent) sea surface and the sky.
+// Ambient occlusion that ignores the (transparent) sea surface and the sky,
+// and cut-out foliage: the AO pass draws leaves as solid cards (it ignores
+// alphaTest), which left pale halos round plants in front of walls.
 class SceneAO extends GTAOPass {
   constructor(scene, camera, w, h, skip) {
     super(scene, camera, w, h);
     this.skip = skip;
+    this.aoScene = scene;
+    this.cutouts = [];
+    this.lastScan = -1e9;
   }
   render(...args) {
-    const was = this.skip.map((o) => o.visible);
-    this.skip.forEach((o) => (o.visible = false));
+    const now = performance.now();
+    if (now - this.lastScan > 2000) {
+      // Things get added as the game goes (animals, the pool), so look again now and then.
+      this.lastScan = now;
+      this.cutouts = [];
+      this.aoScene.traverse((o) => {
+        if (o.isMesh && [].concat(o.material).some((m) => m && m.alphaTest > 0)) this.cutouts.push(o);
+      });
+    }
+    const hide = this.skip.concat(this.cutouts);
+    const was = hide.map((o) => o.visible);
+    hide.forEach((o) => (o.visible = false));
     super.render(...args);
-    this.skip.forEach((o, i) => (o.visible = was[i]));
+    hide.forEach((o, i) => (o.visible = was[i]));
   }
 }
 
