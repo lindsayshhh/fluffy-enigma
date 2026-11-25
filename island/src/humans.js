@@ -19,11 +19,11 @@ export const CASTING = {
 export const EXTRAS = [
   { avatar: 'Sports_Female_01', sex: 'f', idle: 'f_calm', key: 'skye', selfie: true },
   { avatar: 'Sports_Male_01', sex: 'm', idle: 'm_look', key: 'chad', hat: 'visor', beachwear: true },
-  { avatar: 'Female_Party_01', sex: 'f', idle: 'f_calm', evening: 'f_dance' },
+  { avatar: 'Female_Party_01', sex: 'f', idle: 'f_calm', evening: 'f_dance', key: 'partygirl' },
   // The pool crowd.
-  { avatar: 'Male_Adult_03', sex: 'm', idle: 'm_breathe', key: 'gordon', beachwear: true, drink: true },
-  { avatar: 'Female_Adult_13', sex: 'f', idle: 'f_nervous', key: 'doris', beachwear: true, hat: 'sunhat' },
-  { avatar: 'Male_Adult_05', sex: 'm', idle: 'm_idle', key: 'walt', beachwear: true },
+  { avatar: 'Male_Adult_03', sex: 'm', idle: 'm_breathe', key: 'gordon', beachwear: true, bareLegs: true, drink: true },
+  { avatar: 'Female_Adult_13', sex: 'f', idle: 'f_nervous', key: 'doris', beachwear: true, bareLegs: true, hat: 'sunhat' },
+  { avatar: 'Male_Adult_05', sex: 'm', idle: 'm_idle', key: 'walt', beachwear: true, bareLegs: true },
 ];
 
 // Binary data ships as base64 inside JSON so any static host will serve it.
@@ -89,7 +89,7 @@ async function loadClips() {
 }
 
 // beachwear: use the recoloured holiday outfit (tools/beachwear.py) when there is one.
-async function loadAvatar(name, texLoader, fbxLoader, beachwear = false) {
+async function loadAvatar(name, texLoader, fbxLoader, beachwear = false, bareLegs = false) {
   const dir = `${BASE}${name}/`;
   const tex = (file, srgb) =>
     texLoader.loadAsync(dir + file).then(
@@ -108,8 +108,8 @@ async function loadAvatar(name, texLoader, fbxLoader, beachwear = false) {
   });
   const [bodyC, bodyN, headC, headN, opacity] = await Promise.all([
     (beachwear ? tex('body_beach.jpg', true) : Promise.resolve(null)).then((t) => t || tex('body_color.jpg', true)),
-    // Outfits that bare the legs come with smoothed normals for the skin.
-    (beachwear ? tex('body_beach_normal.jpg') : Promise.resolve(null)).then((t) => t || tex('body_normal.jpg')),
+    // Outfits that bare the legs (bareLegs) come with smoothed normals for the skin.
+    (bareLegs ? tex('body_beach_normal.jpg') : Promise.resolve(null)).then((t) => t || tex('body_normal.jpg')),
     tex('head_color.jpg', true),
     tex('head_normal.jpg'),
     hasOpacity ? tex('opacity.png', true) : null,
@@ -150,7 +150,7 @@ export async function loadHumans(onProgress) {
   const models = {};
   await Promise.all(
     names.map((n) =>
-      loadAvatar(n, texLoader, fbxLoader, !!roles.find((r) => r.avatar === n).beachwear).then((m) => {
+      loadAvatar(n, texLoader, fbxLoader, !!roles.find((r) => r.avatar === n).beachwear, !!roles.find((r) => r.avatar === n).bareLegs).then((m) => {
         models[n] = m;
         if (onProgress) onProgress(++done / names.length);
       })
@@ -375,7 +375,16 @@ export class Human {
     for (const n of ['Bip01_LInnerEyebrow', 'Bip01_RInnerEyebrow', 'Bip01_MMiddleEyebrow']) if (B[n]) B[n].position.x += this.brow * 0.25;
   }
 
-  update(dt, t, { moving = false, speed = 1, talking = false, speaking = false, look = null } = {}) {
+  update(dt, t, { moving = false, speed = 1, talking = false, speaking = false, look = null, far = false } = {}) {
+    // Too far away to see the animation: let it catch up when you come closer.
+    if (far) {
+      this.farTime = (this.farTime || 0) + dt;
+      return;
+    }
+    if (this.farTime) {
+      dt += Math.min(this.farTime, 5);
+      this.farTime = 0;
+    }
     let state = 'idle';
     if (moving) state = 'walk';
     else if (talking) state = 'talk';

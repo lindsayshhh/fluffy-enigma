@@ -28,7 +28,7 @@ const rnd = (() => {
 // Wrap a model so it is centred, `size` metres across (largest horizontal
 // side), resting on y = 0 (or centred on it, for fliers and swimmers), and
 // facing +z.
-function normalise(model, { size, forward = 'z', base = true }) {
+function normalise(model, { size, forward = 'z', base = true, shadow = true }) {
   model.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(model);
   const dim = box.getSize(new THREE.Vector3());
@@ -44,7 +44,7 @@ function normalise(model, { size, forward = 'z', base = true }) {
   outer.add(turn);
   model.traverse((o) => {
     if (o.isMesh) {
-      o.castShadow = true;
+      o.castShadow = shadow; // tiny creatures don't need to cast shadows
       o.receiveShadow = true;
       o.frustumCulled = false;
       // Unlit materials would ignore the sun and the time of day.
@@ -100,7 +100,9 @@ function wetSand(x) {
 }
 
 export class Wildlife {
-  constructor(scene, assets, world, L) {
+  // opts.lite: fewer small creatures, for phones and the Low setting.
+  constructor(scene, assets, world, L, opts = {}) {
+    const lite = !!opts.lite;
     this.scene = scene;
     this.world = world;
     this.L = L;
@@ -112,19 +114,20 @@ export class Wildlife {
 
     // Fiddler crabs on the wet sand of the main beach.
     if (S.fiddler) {
-      for (const x of [-68, -57, -44, -31, -12, 3, 16, 29, 62, 71]) {
+      const xs = [-68, -57, -44, -31, -12, 3, 16, 29, 62, 71];
+      for (const x of lite ? xs.filter((_, i) => i % 2 === 0) : xs) {
         const p = wetSand(x + (rnd() - 0.5) * 4);
-        const c = new Creature(S.fiddler, C.fiddler, { size: 0.2 });
+        const c = new Creature(S.fiddler, C.fiddler, { size: 0.2, shadow: false });
         this.add({ key: 'fiddler', c, home: new THREE.Vector3(p.x, 0, p.z - rnd() * 1.4), heading: rnd() * 6.28, mode: 'dance', t: 0 });
       }
     }
     // Hermit crabs wandering the dry sand higher up.
     if (S.hermit) {
-      for (const x of [-63, -38, -20, 8, 24, 55]) {
+      for (const x of lite ? [-63, -20, 24] : [-63, -38, -20, 8, 24, 55]) {
         const p = wetSand(x);
         const z = p.z - 5 - rnd() * 6;
         if (height(x, z) < 0.2 || height(x, z) > 3) continue;
-        const c = new Creature(S.hermit, C.hermit, { size: 0.16 });
+        const c = new Creature(S.hermit, C.hermit, { size: 0.16, shadow: false });
         this.add({ key: 'hermit', c, home: new THREE.Vector3(x, 0, z), target: null, heading: rnd() * 6.28, mode: 'idle', t: rnd() * 5 });
       }
     }
@@ -158,10 +161,10 @@ export class Wildlife {
       const pick = [];
       for (const b of spots) {
         if (pick.every((p) => Math.hypot(p.x - b.x, p.z - b.z) > 14)) pick.push(b);
-        if (pick.length >= 7) break;
+        if (pick.length >= (lite ? 4 : 7)) break;
       }
       for (const b of pick) {
-        const c = new Creature(S.butterfly, C.butterfly, { size: 0.15, base: false });
+        const c = new Creature(S.butterfly, C.butterfly, { size: 0.15, base: false, shadow: false });
         c.speed = 1.3;
         this.add({ key: 'butterfly', c, anchor: { x: b.x, y: b.y + 0.6, z: b.z }, ph: rnd() * 100, heading: 0, prev: new THREE.Vector3() });
       }
@@ -195,8 +198,21 @@ export class Wildlife {
     const pp = player.pos;
     const day = hour > 6.3 && hour < 19.2;
     const fine = rain < 0.3;
+    const cam = camera.position;
     for (const a of this.list) {
       const o = a.c.obj;
+      // Out of sight, out of mind: don't animate small animals far away.
+      if (a.key !== 'gulls' && a.key !== 'turtle' && a.key !== 'macaw') {
+        const far = Math.hypot(o.position.x - cam.x, o.position.z - cam.z) > (a.key === 'ray' ? 60 : 70);
+        if (far) {
+          if (a.key === 'butterfly' || a.key === 'ray') o.visible = false;
+          else o.visible = a.mode !== 'burrow';
+          if (a.key === 'ray') a.ph += dt * 0.08;
+          continue;
+        }
+        if (a.key === 'ray') o.visible = true;
+      }
+      if (a.key === 'turtle' && this.world.turtle.position.distanceTo(cam) > 90) continue;
       switch (a.key) {
         case 'fiddler':
           this.fiddler(a, dt, pp);

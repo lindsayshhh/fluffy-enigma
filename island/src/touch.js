@@ -4,7 +4,7 @@ export const isTouchDevice = () =>
   (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
 
 export class TouchControls {
-  // actions: { interact, journal, pause } callbacks from main.js
+  // actions: { interact, journal, pause, camera } callbacks from main.js
   constructor(player, actions) {
     this.player = player;
     this.actions = actions;
@@ -21,6 +21,7 @@ export class TouchControls {
       <button class="tb act" aria-label="Interact"><span></span></button>
       <button class="tb jump" aria-label="Jump">Jump</button>
       <button class="tb dive" aria-label="Dive">Dive</button>
+      <button class="tb small cam" aria-label="Camera">Camera</button>
       <button class="tb small journal" aria-label="Journal">Journal</button>
       <button class="tb small pause" aria-label="Pause">II</button>`;
     document.body.appendChild(root);
@@ -46,6 +47,7 @@ export class TouchControls {
     press('.jump', (down) => (player.touchJump = down));
     press('.dive', (down) => (player.touchDive = down));
     press('.journal', (down) => down && actions.journal());
+    press('.cam', (down) => down && actions.camera && actions.camera());
     press('.pause', (down) => down && actions.pause());
 
     const canvas = document.getElementById('c');

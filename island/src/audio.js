@@ -175,7 +175,7 @@ export class Audio {
     src.stop(t + 4);
   }
 
-  update(dt, { shore, underwater, night, barDist, wind, hour, rain = 0, underRoof = false }) {
+  update(dt, { shore, underwater, night, barDist, wind, hour, rain = 0, underRoof = false, partyDist = Infinity, party = false }) {
     if (!this.ctx) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
@@ -198,7 +198,11 @@ export class Audio {
 
     // Steel pan loop from The Salty Coconut.
     const open = hour >= 10 && hour < 24.5;
-    const mv = open ? Math.max(0, 1 - barDist / 55) ** 1.5 * 0.9 : 0;
+    const barMv = open ? Math.max(0, 1 - barDist / 55) ** 1.5 * 0.9 : 0;
+    // The pool party plays the same tune, faster, with a kick drum.
+    const partyMv = party ? Math.max(0, 1 - partyDist / 70) ** 1.4 * 1.1 : 0;
+    const mv = Math.max(barMv, partyMv);
+    const groove = partyMv > barMv;
     this.musicGain.gain.value += (mv - this.musicGain.gain.value) * k;
     if (mv > 0.01) {
       const scale = [392, 440, 494, 587, 659, 784, 880];
@@ -208,7 +212,9 @@ export class Audio {
         const s = tune[this.step % tune.length];
         if (s >= 0) this.pan(scale[s], this.nextNote);
         if (this.step % 2 === 0) this.tone(bass[(this.step / 2) % bass.length], 0.35, { type: 'triangle', vol: 0.08, dest: this.musicGain, at: this.nextNote });
-        this.nextNote += 0.28;
+        if (groove && this.step % 2 === 0) this.tone(70, 0.16, { type: 'sine', vol: 0.32, slide: 38, dest: this.musicGain, at: this.nextNote });
+        if (groove && this.step % 4 === 2) this.tone(5200, 0.03, { type: 'square', vol: 0.02, dest: this.musicGain, at: this.nextNote });
+        this.nextNote += groove ? 0.21 : 0.28;
         this.step++;
       }
     } else {
@@ -266,6 +272,14 @@ export class Audio {
   gong() {
     if (!this.ctx) return;
     [110, 164.8, 220.5, 296, 391].forEach((f, i) => this.tone(f, 5 - i * 0.6, { vol: 0.12 / (i + 1), attack: 0.01 }));
+  }
+
+  // Camera shutter: two quick clicks.
+  shutter() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.tone(2400, 0.025, { type: 'square', vol: 0.05, at: t, dest: this.master });
+    this.tone(1600, 0.035, { type: 'square', vol: 0.04, at: t + 0.07, dest: this.master });
   }
 
   // A macaw's harsh two-note squawk.

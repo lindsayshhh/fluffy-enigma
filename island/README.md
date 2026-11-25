@@ -25,7 +25,9 @@ Play it on a computer with a mouse and keyboard, with sound on.
 | `C` | Dive while swimming |
 | `E` | Talk / interact |
 | `1`–`4` | Pick a dialogue choice |
-| `J` | Journal (leads and memories) |
+| `J` | Journal (leads, memories, map and photos) |
+| `M` | Island map |
+| `P` | Camera (click to take a photo) |
 | `H` | Hide the HUD (for screenshots) |
 | `Esc` | Pause and settings |
 
@@ -49,6 +51,17 @@ Play it on a computer with a mouse and keyboard, with sound on.
 
 On a stone terrace behind the beach, between the bar and the volleyball court (stairs come up from the path). Swim in it, ride the twisting water slide, cannonball off the diving board for scores from Chad (and Doris), flop onto the inflatable flamingo, or try to get a lounger off Doris. Don't run on the deck.
 
+### Nights out
+
+- **Pool party** on night two, 7:30 to 11:30 pm: coloured lights, a glowing pool, Gordon on the decks (from the shallow end), Doris and Walt dancing, and a cannonball contest judged by Chad and Doris. A flyer turns up under your door that morning.
+- **The bonfire** on the last night: everyone you've met comes, including Skye, Chad, Doris and Walt. Gordon comes if you got him to relax enough to leave the pool, and Reg leaps in the firelight just offshore.
+
+### Camera and map
+
+Press `P` (or the camera button on a touch screen) to raise your camera: the HUD hides behind a viewfinder, and a click takes a photo. Each photo gets a caption naming whoever or whatever is in the middle of the frame, can be saved to your device, and goes into the album in the journal (for this session). New subjects add a little fun; six of them is a memory. Skye would like to see them.
+
+The journal (`J`) has a map tab (`M`): the island drawn from the terrain, with paths, places, the people you've met where they are right now, and you.
+
 ### Wildlife
 
 Fiddler crabs wave their claws on the wet sand and scuttle sideways (or dive into a burrow) when you get close. Hermit crabs potter about higher up the beach and freeze if you stare. Spotted eagle rays glide over the sandy shallows, a loggerhead turtle cruises the reef, gulls circle overhead, monarch butterflies work the flowering bushes, and a pair of scarlet macaws hop between palm crowns, squawking. The journal keeps a checklist of what you've spotted, and finding all seven is a memory.
@@ -63,6 +76,8 @@ Fiddler crabs wave their claws on the wet sand and scuttle sideways (or dive int
 On a touch screen the game shows on-screen controls: a joystick wherever your left thumb lands (push it all the way to run, and it paddles the kayak too), drag with your right thumb to look, and a yellow button for whatever you can do right now. Jump, Dive (while swimming), Journal and Pause have their own buttons. Touch devices start on the Low graphics setting. Hold the device sideways.
 
 One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
+
+The animals load in the background after you start, so the title screen is ready sooner. Characters and animals far from you aren't animated until you get closer, and phones (and the Low setting) get fewer small creatures.
 
 ## The locals
 
@@ -91,6 +106,7 @@ One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 | `src/layout.js` | Where everything sits, derived from the real shoreline |
 | `src/humans.js` | Realistic Rocketbox characters: loading, animation blending, head tracking, lip movement and blinking, props |
 | `src/weather.js` | Showers, wet ground, rain sound cues, the overcast veil and rainbows |
+| `src/map.js` | The island map in the journal |
 | `src/pool.js` | The terrace pool: basin, water, slide, diving board, loungers, inflatables, and the slide and cannonball rides |
 | `src/wildlife.js` | Crabs, rays, turtle, gulls, butterflies and macaws, and the spotting checklist |
 | `src/dolphin.js` | Reg: patrolling, surfacing, coming over to talk, leaps and tow rides |

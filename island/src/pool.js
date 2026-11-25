@@ -241,6 +241,7 @@ export class Pool {
     this.caustics = causticTexture();
     this.caustics.repeat.set(0.35, 0.35);
     const tileMat = new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.25, emissive: 0xffffff, emissiveMap: this.caustics, emissiveIntensity: 0.28 });
+    this.tileMat = tileMat;
     const coping = new THREE.MeshStandardMaterial({ color: 0xf4efe4, roughness: 0.5 });
     const white = new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.45 });
     const steel = new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.2, metalness: 0.9 });
@@ -546,7 +547,89 @@ export class Pool {
       gordon: { x: X(POOL.x0 + 3.2), z: Z(-1.5), face: Math.PI / 2 },
       reserved: { x: X(-11), z: Z(DECK.z0 + 2.7) },
     };
+    // Party night: where people stand (on the south deck, by the music).
+    this.partySpots = {
+      doris: { x: X(-5.5), z: Z(7.6), face: 0.4 },
+      walt: { x: X(-4.2), z: Z(8.1), face: -0.5 },
+      partygirl: { x: X(-7.2), z: Z(8.6), face: 0.9 },
+      skye: { x: X(4.5), z: Z(7.8), face: -1.4 },
+      chad: this.spots.chad,
+      gordon: this.spots.gordon,
+    };
     this.ride = null;
+    this.party = null;
+    this.partyOn = false;
+  }
+
+  // Party decorations, built the first time the party starts: strings of
+  // coloured bulbs round the deck, a glowing pool, and Gordon's speakers.
+  buildParty() {
+    const grp = new THREE.Group();
+    this.grp.add(grp);
+    const c = this.c;
+    const d = this.deck;
+    const X = (v) => c.x + v;
+    const Z = (v) => c.z + v;
+    const pole = new THREE.MeshStandardMaterial({ color: 0x5b4636, roughness: 0.8 });
+    const corners = [[DECK.x0 + 0.6, DECK.z0 + 0.6], [DECK.x1 - 0.6, DECK.z0 + 0.6], [DECK.x1 - 0.6, DECK.z1 - 0.6], [DECK.x0 + 0.6, DECK.z1 - 0.6]];
+    const H = 3.4;
+    for (const [px, pz] of corners) this.world.cyl(0.06, 0.07, H, pole, X(px), d + H / 2, Z(pz), grp, 8);
+    // Bulbs hanging in loose curves between the poles, and across the middle.
+    const runs = [...corners.map((p, i) => [p, corners[(i + 1) % 4]]), [corners[0], corners[2]], [corners[1], corners[3]]];
+    const bulbPos = [];
+    const wire = [];
+    for (const [a, b] of runs) {
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const n = Math.round(len / 1.1);
+      for (let i = 0; i <= n; i++) {
+        const u = i / n;
+        const x = X(a[0] + (b[0] - a[0]) * u);
+        const z = Z(a[1] + (b[1] - a[1]) * u);
+        const y = d + H - 0.1 - Math.sin(u * Math.PI) * (len > 30 ? 1.3 : 0.8);
+        bulbPos.push([x, y - 0.12, z]);
+        wire.push(x, y, z);
+        if (i > 0 && i < n) wire.push(x, y, z);
+      }
+    }
+    const wires = new THREE.BufferGeometry();
+    wires.setAttribute('position', new THREE.Float32BufferAttribute(wire, 3));
+    grp.add(new THREE.LineSegments(wires, new THREE.LineBasicMaterial({ color: 0x222222 })));
+    const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.075, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), bulbPos.length);
+    const palette = [0xffd166, 0xff5d8f, 0x4cc9f0, 0x80ed99, 0xff9f1c].map((h) => new THREE.Color(h).multiplyScalar(2.2));
+    const m4 = new THREE.Matrix4();
+    bulbPos.forEach((p, i) => {
+      m4.makeTranslation(p[0], p[1], p[2]);
+      bulbs.setMatrixAt(i, m4);
+      bulbs.setColorAt(i, palette[i % palette.length]);
+    });
+    bulbs.frustumCulled = false;
+    grp.add(bulbs);
+    // Gordon's sound system: two speakers on the deck by the shallow end.
+    const dark = new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: 0.6 });
+    const cone = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0x4cc9f0, emissiveIntensity: 0.6 });
+    this.speakers = [];
+    for (const dz of [-3.2, 1.8]) {
+      const sp = this.world.box(0.55, 0.9, 0.5, dark, X(POOL.x0 - 1.2), d + 0.45, Z(dz), grp);
+      const ring = new THREE.Mesh(new THREE.CircleGeometry(0.17, 18), cone);
+      ring.position.set(0.28, 0.12, 0);
+      ring.rotation.y = Math.PI / 2;
+      sp.add(ring);
+      this.speakers.push(ring);
+    }
+    this.party = { grp, bulbs };
+  }
+
+  setParty(on) {
+    if (on === this.partyOn) return;
+    if (on && !this.party) this.buildParty();
+    this.partyOn = on;
+    if (this.party) this.party.grp.visible = on;
+    // The pool glows from its underwater lights.
+    const m = this.water.material;
+    m.emissive.set(on ? 0x18b4e8 : 0x000000);
+    m.emissiveIntensity = on ? 0.9 : 0;
+    this.tileMat.emissiveIntensity = on ? 0.9 : 0.28;
+    this.tileMat.emissive.set(on ? 0x7fe6ff : 0xffffff);
   }
 
   text(lines, w = 256, h = 96, bg = null, fg = '#1d3557') {
@@ -651,6 +734,11 @@ export class Pool {
       if (this.splashT <= 0) this.splashPts.visible = false;
     }
     if (this.ride) this.updateRide(dt, player);
+    if (this.partyOn && this.speakers) {
+      // Speakers thump in time with the music.
+      const beat = Math.pow(Math.max(0, Math.sin(t * Math.PI * 2.4)), 6);
+      for (const sp of this.speakers) sp.scale.setScalar(1 + beat * 0.25);
+    }
   }
 
   updateRide(dt, player) {

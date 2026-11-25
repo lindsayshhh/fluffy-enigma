@@ -133,6 +133,24 @@ export class Dolphin {
     return player.swimming || player.kayak || atDockEnd;
   }
 
+  // The last night: perform in front of the bonfire (null to stop).
+  setStage(spot) {
+    if (!spot) {
+      if (this.stage) {
+        this.home = this.stage.home;
+        this.radius = 13;
+        this.stage = null;
+      }
+      return;
+    }
+    if (this.stage) return;
+    let z = spot.z + 8;
+    for (let i = 0; i < 80 && height(spot.x, z) > -2.8; i++) z += 1;
+    this.stage = { home: this.home, next: 0 };
+    this.home = { x: spot.x, z: z + 6 };
+    this.radius = 6;
+  }
+
   // ------------------------------------------------------------- tricks
   leap(kind = 'leap') {
     this.trick = { kind, t: 0, dur: kind === 'spin' ? 2.4 : 2.0, from: this.pos.clone(), dir: this.heading };
@@ -238,6 +256,11 @@ export class Dolphin {
         this.state = 'patrol';
         this.angle += (3.2 / this.radius) * dt;
         target = this.patrolPoint(this.angle + 0.5);
+        // Showtime at the bonfire: a leap every so often.
+        if (this.stage && t > this.stage.next && Math.hypot(this.pos.x - this.home.x, this.pos.z - this.home.z) < this.radius + 3) {
+          this.stage.next = t + 9 + Math.random() * 8;
+          this.leap(Math.random() < 0.5 ? 'spin' : 'leap');
+        }
       }
 
       if (target) {

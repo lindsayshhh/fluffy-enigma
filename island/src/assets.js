@@ -18,7 +18,10 @@ const TEXTURES = [
 const MODELS = ['lambis_shell', 'bar_chair_round_01', 'rock_07', 'rock_09'];
 // Whole scenes from Sketchfab (CC BY; see assets/CREDITS.md), kept intact so
 // props.js can split them into individual trees and plants.
-const SCENES = ['palms', 'coconut_palm', 'tropical_plants', 'lounger', 'dolphin', 'fiddler', 'hermit', 'turtle', 'ray', 'gulls', 'butterfly', 'macaw'];
+const SCENES = ['palms', 'coconut_palm', 'tropical_plants', 'lounger'];
+// Animals load in the background after the game starts (loadLateScenes),
+// so the title screen is ready sooner.
+const LATE_SCENES = ['dolphin', 'fiddler', 'hermit', 'turtle', 'ray', 'gulls', 'butterfly', 'macaw'];
 
 // `failed` lists anything that couldn't load, so the game can say so.
 export const assets = { tex: {}, models: {}, scenes: {}, clips: {}, failed: [] };
@@ -113,23 +116,29 @@ export async function loadAssets(renderer, onProgress) {
       })
   );
 
-  const sceneJobs = SCENES.map((name) =>
-    loadEmbeddedGltf(gltfLoader, `assets/sketchfab/${name}/${name}.json`)
-      .then((g) => {
-        g.scene.updateMatrixWorld(true);
-        assets.scenes[name] = g.scene;
-        assets.clips[name] = g.animations;
-        tick();
-      })
-      .catch((e) => {
-        console.warn('Scene failed, using procedural fallback:', name, e);
-        assets.failed.push(name);
-        tick();
-      })
-  );
+  const sceneJobs = SCENES.map((name) => loadScene(gltfLoader, name).then(tick));
 
   await Promise.all([...texJobs, ...modelJobs, ...sceneJobs]);
   return assets;
+}
+
+function loadScene(loader, name) {
+  return loadEmbeddedGltf(loader, `assets/sketchfab/${name}/${name}.json`)
+    .then((g) => {
+      g.scene.updateMatrixWorld(true);
+      assets.scenes[name] = g.scene;
+      assets.clips[name] = g.animations;
+    })
+    .catch((e) => {
+      console.warn('Scene failed, using procedural fallback:', name, e);
+      assets.failed.push(name);
+    });
+}
+
+// The animals: fetched after the game has started.
+export function loadLateScenes() {
+  const loader = new GLTFLoader();
+  return Promise.all(LATE_SCENES.map((name) => loadScene(loader, name))).then(() => assets);
 }
 
 // A material built from one of the textures, tiled every `tile` metres

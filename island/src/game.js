@@ -237,6 +237,12 @@ export class Game {
     return s.day >= VACATION_DAYS && s.hour >= 19.5 && s.hour < 25;
   }
 
+  // The second night: a party at the pool.
+  poolPartyActive() {
+    const s = this.s;
+    return !!this.pool && s.day === 2 && s.hour >= 19.5 && s.hour < 23.5;
+  }
+
   shelterSpot(key) {
     const order = ['brenda', 'captain', 'gary', 'marisol', 'pearl'];
     const a = (order.indexOf(key) / order.length) * Math.PI * 2 + 0.6;
@@ -304,7 +310,7 @@ export class Game {
       P.group.rotation.y += dy * Math.min(1, dt * (talking ? 5 : 3));
       n.pos.y = THREE.MathUtils.damp(n.pos.y, this.world.groundAt(n.pos.x, n.pos.z, n.pos.y), 12, dt);
       if (n.key !== 'gary') P.pose = !n.moving && target.pose ? target.pose : null;
-      P.update(dt, t, { moving: n.moving, speed: n.def.speed / 1.2, talking, speaking: talking && this.ui.typing, look: distP < 7 ? pp : null });
+      P.update(dt, t, { moving: n.moving, speed: n.def.speed / 1.2, talking, speaking: talking && this.ui.typing, look: distP < 7 ? pp : null, far: distP > 75 && !talking });
     }
   }
 
@@ -868,6 +874,42 @@ export class Game {
         ? 'Nana Pearl demands a rematch next year. She has already started training. She is eighty-four.'
         : 'Nana Pearl wins a marshmallow-roasting contest nobody else knew was happening. She gloats for twenty minutes.'
     );
+    if (f.metSkye)
+      cards.push(
+        f.skyePhoneDown
+          ? "Skye left her phone in her room. 'For the whole evening,' she says, mostly to herself. She keeps reaching for her pocket, finds nothing, and laughs every time."
+          : f.skyeGoodPhoto
+            ? "Skye films the fire for exactly four seconds, then puts her phone face-down in the sand. 'Progress,' she says."
+            : 'Skye livestreams the bonfire to her 412 followers. Eleven are watching. One is her mom, twice.'
+      );
+    if (f.metChad)
+      cards.push(
+        has('cannonball')
+          ? "Chad stands at the edge of the circle making sure nobody runs. He tells everyone about your cannonball. The score has crept up to a 9.5."
+          : 'Chad stands at the edge of the circle with his whistle, making sure nobody runs. Nobody runs. He has never been happier.'
+      );
+    if (f.metDoris)
+      cards.push(
+        f.towelPeace
+          ? "Doris has reserved you a log. There's a towel on it, folded into a perfect square. Walt stands guard, says 'Yes, dear' to the fire, and winks at you."
+          : f.towelWar
+            ? "Doris and Brenda sit at opposite ends of the circle with a towel on every seat in between. Walt and the fire avoid eye contact."
+            : 'Doris has reserved three logs with towels. Walt tells the fire, very quietly, about the rhinoceros.'
+      );
+    if (f.metDoris && has('turtle')) cards.push("When the Captain mentions Doris the sea turtle, Doris Huxley says 'Excuse me?' and the story gets a lot shorter.");
+    if (f.metGordon)
+      cards.push(
+        has('gordon')
+          ? "And then Gordon walks up the beach. Out of the pool. On dry land. Wrapped in a towel, wrinkled like a raisin, holding a drink. 'I adjourned the meeting,' he says. Everyone stands up and claps."
+          : "Gordon isn't there. He sends his regards from the pool, via Chad, who heard them shouted across two hundred metres of beach."
+      );
+    cards.push(
+      f.metReg
+        ? s.memories.some((m) => m.id === 'reg_phone')
+          ? "Out past the waves, a fin catches the firelight. Reg leaps once, high and clean, and the whole circle cheers. He seems to be wearing your phone charger as a necklace. Let it go."
+          : 'Out past the waves, a fin catches the firelight. Reg leaps once, high and clean, and the whole circle cheers. Somewhere out there, a sardine meeting has been cancelled.'
+        : "Something leaps out of the dark sea beyond the firelight. 'Dolphin,' says the Captain. 'Probably.'"
+    );
     if (f.foundLair || has('kevin')) cards.push('Kevin lands at the edge of the firelight with a churro. Nobody knows where he got it. Nobody asks.');
     cards.push("The fire burns down to embers. A wave folds onto the sand, then another. For the first time in a long time, you are not thinking about Monday.");
     this.setFlag('bonfireDone');
@@ -1011,6 +1053,10 @@ export class Game {
       this.ui.toast("There's something strange on the little beach in this hidden cove...", 'item');
     }
     this.world.setBonfire(this.bonfireActive());
+    if (this.pool && s.day === 2 && s.hour >= 9 && s.hour < 23 && !s.flags.partyAnnounced) {
+      this.setFlag('partyAnnounced');
+      this.ui.toast("A flyer under your door: POOL PARTY TONIGHT, 7:30 pm. Cannonball contest! Judges: Chad (and Doris).", 'item');
+    }
     if (s.day >= VACATION_DAYS && s.hour >= 18.5 && !s.flags.bonfireAnnounced) {
       this.setFlag('bonfireAnnounced');
       this.ui.toast("Dez, from across the beach: 'Bonfire tonight, half seven. Everyone's coming. Even Kevin, probably.'", 'item');
@@ -1110,6 +1156,7 @@ export class Game {
     if (f.metPearl) add(!!f.beatPearl, 'Nana Pearl plays volleyball on the south beach during the day. Beat her. If you can.');
     if (f.metMarisol) add(s.memories.some((m) => m.id === 'yoga'), 'Marisol leads sunset yoga on the west deck, around 5 to 7:30 pm.');
     if (f.metCaptain) add(s.memories.some((m) => m.id === 'turtle'), 'Captain Lorenzo runs snorkel tours from the dock, 9 am to 4 pm ($60).');
+    if (s.flags.partyAnnounced) add(s.memories.some((m) => m.id === 'pool_party'), 'Pool party on night two, 7:30 to 11:30 pm, with a cannonball contest judged by Chad and Doris.');
     if (s.flags.bonfireAnnounced) add(!!s.flags.bonfireDone, 'Last night of the trip: bonfire on the main beach from 7:30 pm. Everyone will be there.');
     if (s.items.sandal) add(false, "You fished up a sandal with 'GARY' written inside. Someone might want it back.");
     if (s.items.ring) add(false, "A gold ring from Kevin's nest. Someone on this island has been missing it for a long time.");

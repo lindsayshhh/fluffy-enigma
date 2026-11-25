@@ -496,12 +496,83 @@ export class UI {
     return close;
   }
 
-  journal(entries, s, onClose) {
+  // The journal has three tabs: leads and memories, the island map, and the
+  // photo album. extra = { tab, drawMap(canvas), photos }.
+  journal(entries, s, onClose, extra = {}) {
     const quests = entries.length
       ? entries.map((e) => `<li class="${e.done ? 'done' : ''}">${esc(e.text)}</li>`).join('')
       : '<li>Nothing yet. Go talk to people. Everyone here has a story, and most of them are a little ridiculous.</li>';
     const mems = s.memories.length ? s.memories.map((m) => `<li><em>Day ${m.day}</em> ${esc(m.text)}</li>`).join('') : '<li>No memories yet. Make some.</li>';
-    this.openPanel('#journal', `<h3>Things to look into</h3><ul class="quests">${quests}</ul><h3>Memories (${s.memories.length})</h3><ul class="mems">${mems}</ul>`, onClose);
+    const photos = extra.photos || [];
+    const album = photos.length
+      ? `<div class="album">${photos.map((p, i) => `<figure><img src="${p.thumb}" alt="" data-i="${i}" /><figcaption>${esc(p.caption)}</figcaption></figure>`).join('')}</div>`
+      : `<p class="empty">No photos yet. Press <kbd>P</kbd> (or the camera button) to take some.</p>`;
+    const html = `<div class="tabs"><button data-tab="log">Journal</button><button data-tab="map">Map</button><button data-tab="photos">Photos (${photos.length})</button></div>
+      <div class="tab" data-tab="log"><h3>Things to look into</h3><ul class="quests">${quests}</ul><h3>Memories (${s.memories.length})</h3><ul class="mems">${mems}</ul></div>
+      <div class="tab" data-tab="map"><canvas class="map" width="1200" height="1054"></canvas><p class="legend"><span class="dot you"></span> You <span class="dot npc"></span> People you've met (press <kbd>M</kbd> to open the map)</p></div>
+      <div class="tab" data-tab="photos">${album}</div>`;
+    const close = this.openPanel('#journal', html, onClose);
+    const el = $('#journal');
+    const show = (tab) => {
+      el.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+      el.querySelectorAll('.tab').forEach((t) => (t.hidden = t.dataset.tab !== tab));
+      if (tab === 'map' && extra.drawMap) extra.drawMap(el.querySelector('canvas.map'));
+    };
+    el.querySelectorAll('.tabs button').forEach((b) => (b.onclick = () => show(b.dataset.tab)));
+    el.querySelectorAll('.album img').forEach((img) => (img.onclick = () => this.photoCard(photos[+img.dataset.i], null, false)));
+    show(extra.tab || 'log');
+    // M and J switch tabs while the journal is open.
+    const base = this.keyHandler;
+    this.keyHandler = (e) => {
+      if (e.code === 'KeyM') return show('map');
+      return base(e);
+    };
+    return close;
+  }
+
+  // A just-taken photo (or one from the album): a polaroid with a caption
+  // and a way to save it. onDone(keepShooting) when it's dismissed.
+  photoCard(photo, onDone, fresh = true) {
+    let el = $('#photocard');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'photocard';
+      el.innerHTML = '<div class="polaroid"><img alt="" /><p class="cap"></p><div class="row"><a class="save" download>Save photo</a><button class="again">Keep shooting</button><button class="done">Done</button></div></div>';
+      document.body.appendChild(el);
+    }
+    el.querySelector('img').src = photo.full || photo.thumb;
+    el.querySelector('.cap').textContent = photo.caption;
+    const save = el.querySelector('.save');
+    save.href = photo.full || photo.thumb;
+    save.download = `palmera-cay-${photo.n || 1}.jpg`;
+    el.querySelector('.again').hidden = !fresh;
+    el.classList.add('show');
+    const prev = this.keyHandler;
+    const close = (again) => {
+      el.classList.remove('show');
+      this.keyHandler = fresh ? null : prev;
+      if (onDone) onDone(again);
+    };
+    el.querySelector('.again').onclick = () => close(true);
+    el.querySelector('.done').onclick = () => close(false);
+    this.keyHandler = (e) => {
+      if (e.code === 'Escape' || e.code === 'Enter' || e.code === 'KeyP') {
+        e.preventDefault();
+        close(e.code === 'Enter' && fresh);
+      }
+    };
+  }
+
+  flash() {
+    let f = $('#flash');
+    if (!f) {
+      f = document.createElement('div');
+      f.id = 'flash';
+      document.body.appendChild(f);
+    }
+    f.classList.remove('go');
+    void f.offsetWidth;
+    f.classList.add('go');
   }
 
   postcard(sum, last, onNext) {

@@ -661,8 +661,27 @@ export const CHARACTERS = {
             go: 'sunset',
           },
           { text: 'Put the phone down for an hour. Come look at the water.', if: (s) => !s.flags.skyePhoneDown, go: 'convince' },
+          { text: 'Want to see my holiday photos?', if: (s, g) => g.photos && g.photos.length > 0 && !s.flags.skyeSawPhotos, go: 'photos' },
           { text: 'How is the content going?', fx: { fun: 3 }, go: 'hubAgain' },
           { text: 'Enjoy the beach, Skye.', end: true },
+        ],
+      },
+      photos: {
+        text: (s, g) => {
+          const subj = new Set(g.photos.map((p) => p.subject));
+          if (subj.has('skye')) return "She stops on the one of her. 'That's... me? I'm not even posing. I'm just standing there being on holiday.' She's quiet for a second. 'Can you send me this one? Not to post. To keep.'";
+          if ([...subj].some((k) => ['macaw', 'ray', 'turtle', 'fiddler', 'hermit', 'butterfly', 'gulls', 'reg'].includes(k)))
+            return "'Wait. You took these? With your actual eyes?' She scrolls back and forth. 'I've been here six hours and I've only photographed my own face. Where IS all this?'";
+          return "'It's all views. There isn't a single person in any of them.' She looks genuinely moved. 'How did you get nobody in them? Teach me.'";
+        },
+        choices: [
+          {
+            text: '(show her how to point it at something else)',
+            set: ['skyeSawPhotos'],
+            fx: { fun: 6, relax: 4 },
+            act: (g) => g.memory('skye_photos', 'Showed Skye your holiday photos. She pointed her phone at the sea for the first time all week.'),
+            go: 'hub',
+          },
         ],
       },
       hubAgain: {
@@ -829,11 +848,16 @@ export const CHARACTERS = {
             "Every day I put on the visor and I become something greater. A man in a visor.",
           ]),
         choices: [
+          { text: 'About this pool party...', if: (s) => s.flags.partyAnnounced && s.day === 2, go: 'party' },
           { text: 'Will you judge my cannonball?', go: 'judge' },
           { text: 'Ever had to save anyone?', go: 'save' },
           { text: 'Do you ever go in the water?', go: 'water' },
           { text: 'Carry on, Chad.', end: true },
         ],
+      },
+      party: {
+        text: "Cannonball contest, half seven. I'm head judge. Doris is the other judge. Nobody asked her. Nobody ever asks Doris. She's just... there, with a scorecard. Running is still banned. Especially dance-running.",
+        choices: [{ text: "I'll be there.", fx: { fun: 4 }, go: 'hub' }],
       },
       judge: {
         text: "Off the board. I score on splash radius, tuck, and how much of it lands on Doris. Doris has never given anyone above a three.",

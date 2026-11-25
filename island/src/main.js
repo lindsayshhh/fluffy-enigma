@@ -10,7 +10,7 @@ import { UI } from './ui.js';
 import { Player } from './player.js';
 import { Game, loadSave, clearSave, newState } from './game.js';
 import { smoothstep } from './noise.js';
-import { loadAssets } from './assets.js';
+import { loadAssets, loadLateScenes } from './assets.js';
 import { loadHumans, makeHumanCast } from './humans.js';
 import { Post } from './post.js';
 import { Weather } from './weather.js';
@@ -19,6 +19,7 @@ import { CHARACTERS } from './dialogue.js';
 import { Dolphin } from './dolphin.js';
 import { Wildlife, SPECIES } from './wildlife.js';
 import { Pool } from './pool.js';
+import { drawMap } from './map.js';
 
 const TOUCH = isTouchDevice();
 if (TOUCH) document.body.classList.add('touch');
@@ -54,7 +55,12 @@ const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 60
 
 const params = new URLSearchParams(location.search);
 const step = () => new Promise((r) => requestAnimationFrame(() => r()));
-const status = (t) => (startBtn.textContent = t);
+const loadBar = document.querySelector('#loadbar i');
+// Status text on the start button, plus overall progress (0..1) on the bar.
+const status = (t, f) => {
+  startBtn.textContent = t;
+  if (loadBar && f !== undefined) loadBar.style.width = `${Math.round(f * 100)}%`;
+};
 
 let game;
 let player;
@@ -92,9 +98,9 @@ function applyQuality(q) {
 }
 
 async function build() {
-  status('Unpacking textures…');
-  const assets = await loadAssets(renderer, (f) => status(`Unpacking textures… ${Math.round(f * 100)}%`));
-  status('Raising the island…');
+  status('Unpacking textures…', 0.02);
+  const assets = await loadAssets(renderer, (f) => status(`Unpacking textures… ${Math.round(f * 100)}%`, 0.02 + f * 0.38));
+  status('Raising the island…', 0.42);
   await step();
   L = computeLayout();
   const T = assets.tex;
@@ -104,13 +110,13 @@ async function build() {
   water = buildWater(terrain.heightTex);
   scene.add(water);
 
-  status('Painting the sky…');
+  status('Painting the sky…', 0.48);
   await step();
   sky = new SkySystem(renderer, scene);
   weather = new Weather(scene);
   applyQuality(quality);
 
-  status('Planting palms…');
+  status('Planting palms…', 0.52);
   await step();
   world = new World(scene, L);
   try {
@@ -119,13 +125,12 @@ async function build() {
     console.warn('Pool failed to build', e);
   }
 
-  status('Waking up the locals…');
+  status('Waking up the locals…', 0.6);
   await step();
   const cast = makeCast();
   let extras = [];
   try {
-    status('Waking up the locals… 0%');
-    const humans = await loadHumans((f) => status(`Waking up the locals… ${Math.round(f * 100)}%`));
+    const humans = await loadHumans((f) => status(`Waking up the locals… ${Math.round(f * 100)}%`, 0.6 + f * 0.38));
     const made = makeHumanCast(humans);
     Object.assign(cast, made.cast);
     extras = made.extras;
@@ -134,18 +139,6 @@ async function build() {
     assets.failed.push('characters');
   }
   setupExtras(extras);
-  try {
-    wildlife = new Wildlife(scene, assets, world, L);
-  } catch (e) {
-    console.warn('Wildlife failed to set up', e);
-  }
-  if (assets.scenes.dolphin) {
-    try {
-      dolphin = new Dolphin(scene, assets.scenes.dolphin, assets.clips.dolphin, L);
-    } catch (e) {
-      console.warn('Dolphin failed to set up', e);
-    }
-  }
   const gull = makeSeagull();
   scene.add(gull);
   audio = new Audio();
@@ -156,6 +149,7 @@ async function build() {
     touch = new TouchControls(player, {
       interact: () => {
         if (!started || game.busy || !player.enabled) return;
+        if (photoMode) return snapPhoto();
         if (game.focus()) game.interact();
         else if (player.swimming) {
           // "Climb out" is Space on a keyboard.
@@ -164,6 +158,7 @@ async function build() {
         }
       },
       journal: () => openJournal(),
+      camera: () => setPhotoMode(!photoMode),
       pause: () => openPause(),
     });
   }
@@ -180,8 +175,6 @@ async function build() {
   };
   game = fresh();
   addExtraInteractions(game);
-  if (dolphin) addDolphin(game);
-  if (wildlife) hookWildlife(game);
   if (pool) hookPool(game);
   player.teleport(L.spawn.x, L.spawn.z, world.myHut.deckY, -0.7);
 
@@ -190,6 +183,7 @@ async function build() {
 
   player.onUnlock = () => {
     if (started && !game.busy) {
+      if (photoMode) setPhotoMode(false);
       pauseEl.classList.add('show');
     }
   };
@@ -203,7 +197,8 @@ async function build() {
     }
   };
 
-  status('Start your vacation');
+  status('Start your vacation', 1);
+  document.getElementById('loadbar').classList.add('done');
   startBtn.disabled = false;
   if (saved) {
     contBtn.hidden = false;
@@ -227,6 +222,24 @@ async function build() {
     console.warn('Post-processing unavailable; rendering directly.', e);
     post = null;
   }
+
+  // The animals arrive in the background once everything else is up.
+  loadLateScenes().then((a) => {
+    try {
+      wildlife = new Wildlife(scene, a, world, L, { lite: TOUCH || quality === 'low' });
+      hookWildlife(game);
+    } catch (e) {
+      console.warn('Wildlife failed to set up', e);
+    }
+    if (a.scenes.dolphin) {
+      try {
+        dolphin = new Dolphin(scene, a.scenes.dolphin, a.clips.dolphin, L);
+        addDolphin(game);
+      } catch (e) {
+        console.warn('Dolphin failed to set up', e);
+      }
+    }
+  });
 
   window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList, dolphin: () => dolphin, wildlife: () => wildlife, pool: () => pool };
   requestAnimationFrame(loop);
@@ -257,15 +270,127 @@ function begin(resumed) {
 canvas.addEventListener('click', () => {
   if (started && game && !game.busy && !pauseEl.classList.contains('show')) player.lock();
 });
-function openJournal() {
+const NAMES = Object.fromEntries(Object.entries(CHARACTERS).map(([k, v]) => [k, v.name]));
+function openJournal(tab = 'log') {
   if (!started || game.busy) return;
+  if (photoMode) setPhotoMode(false);
   game.busy = true;
   player.unlock();
-  ui.journal(game.journal(), game.s, () => {
-    game.busy = false;
-    player.lock();
-  });
+  ui.journal(
+    game.journal(),
+    game.s,
+    () => {
+      game.busy = false;
+      player.lock();
+    },
+    { tab, photos, drawMap: (c) => drawMap(c, { L, game, player, extras: extraList, dolphin, names: NAMES }) }
+  );
 }
+
+// ---------------------------------------------------------------- camera
+let photoMode = false;
+const photos = [];
+function setPhotoMode(on) {
+  if (on && (!started || game.busy || !player.enabled)) return;
+  photoMode = on;
+  document.body.classList.toggle('photo', on);
+}
+
+// Who or what is in the middle of the frame?
+const _pv = new THREE.Vector3();
+function photoSubject() {
+  const cands = [];
+  for (const [key, n] of Object.entries(game.npcs)) if (n.person.group.visible) cands.push({ key, name: NAMES[key], pos: _pv.set(n.pos.x, n.pos.y + 1.4, n.pos.z).clone(), range: 30 });
+  for (const e of extraList) {
+    if (!e.h.group.visible) continue;
+    const key = e.h.role.key;
+    const p = e.h.group.position;
+    cands.push({ key: key || 'stranger', name: NAMES[key] || 'a stranger having the time of her life', pos: new THREE.Vector3(p.x, p.y + 1.4, p.z), range: 30 });
+  }
+  if (dolphin) cands.push({ key: 'reg', name: game.s.flags.metReg ? 'Reg' : 'a dolphin', pos: dolphin.head(new THREE.Vector3()), range: 35 });
+  if (game.gull && game.gull.visible) cands.push({ key: 'kevin', name: 'Kevin the seagull', pos: game.gull.getWorldPosition(new THREE.Vector3()), range: 25 });
+  if (wildlife) {
+    for (const a of wildlife.list) {
+      const o = a.key === 'turtle' ? world.turtle : a.c.obj;
+      if (!o.visible && a.key !== 'turtle') continue;
+      const small = a.key === 'fiddler' || a.key === 'hermit' || a.key === 'butterfly';
+      cands.push({ key: a.key, name: a.key === 'gulls' ? 'seagulls over the beach' : `a ${SPECIES[a.key].label}`, pos: o.getWorldPosition(new THREE.Vector3()), range: small ? 8 : a.key === 'gulls' ? 60 : 30 });
+    }
+  }
+  let best = null;
+  let bestScore = Infinity;
+  for (const c of cands) {
+    const d = c.pos.distanceTo(camera.position);
+    if (d > c.range) continue;
+    const v = c.pos.clone().project(camera);
+    if (v.z > 1 || Math.abs(v.x) > 0.8 || Math.abs(v.y) > 0.85) continue;
+    const score = d * (1 + Math.abs(v.x) + Math.abs(v.y));
+    if (score < bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  }
+  return best;
+}
+
+function snapPhoto() {
+  if (!photoMode || game.busy) return;
+  const hour = game.s.hour % 24;
+  if (post) post.render(0, t, { focus: null, underwater: player.underwater });
+  else renderer.render(scene, camera);
+  let full;
+  try {
+    full = canvas.toDataURL('image/jpeg', 0.9);
+  } catch (e) {
+    console.warn('Could not capture the photo', e);
+    return;
+  }
+  const subj = photoSubject();
+  const when = hour >= 17.3 && hour < 19.3 ? ' at golden hour' : hour >= 19.3 || hour < 5.5 ? ' at night' : '';
+  let caption;
+  if (subj) caption = `${subj.name[0].toUpperCase()}${subj.name.slice(1)}${when}, day ${game.s.day}`;
+  else if (pool && pool.onDeck(player.pos.x, player.pos.z)) caption = `The pool${when}, day ${game.s.day}`;
+  else caption = hour >= 17.3 && hour < 19.3 ? `Sunset over Palmera Cay, day ${game.s.day}` : hour >= 19.3 || hour < 5.5 ? `Palmera Cay by night, day ${game.s.day}` : `Palmera Cay, day ${game.s.day}`;
+  // A small copy for the album.
+  const img = new Image();
+  const photo = { full, thumb: full, caption, subject: subj ? subj.key : null, n: photos.length + 1 };
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = 480;
+    c.height = Math.round((480 * img.height) / img.width);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    photo.thumb = c.toDataURL('image/jpeg', 0.75);
+  };
+  img.src = full;
+  photos.push(photo);
+  if (photos.length > 24) photos.shift().full = null;
+  game.photos = photos;
+  ui.flash();
+  audio.shutter();
+  // Something new for the album?
+  const seen = (game.s.photoSubjects = game.s.photoSubjects || {});
+  if (subj && !seen[subj.key]) {
+    seen[subj.key] = true;
+    game.fx({ fun: 4, relax: 2 });
+    const n = Object.keys(seen).length;
+    if (n >= 6) game.memory('photographer', `Filled a holiday album: ${n} different subjects, from ${photos.find((p) => p.subject).caption.split(',')[0].toLowerCase()} onwards.`);
+  }
+  game.busy = true;
+  player.unlock();
+  setTimeout(
+    () =>
+      ui.photoCard(photo, (again) => {
+        game.busy = false;
+        player.lock();
+        if (!again) setPhotoMode(false);
+      }),
+    250
+  );
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  if (photoMode && player.locked && e.button === 0) snapPhoto();
+});
 
 function openPause() {
   if (!started || game.busy) return;
@@ -288,6 +413,9 @@ addEventListener('keydown', (e) => {
   if (game.busy || !player.enabled) return;
   if (e.code === 'KeyE') game.interact();
   if (e.code === 'KeyJ') openJournal();
+  if (e.code === 'KeyM') openJournal('map');
+  if (e.code === 'KeyP') setPhotoMode(!photoMode);
+  if (e.code === 'Enter' && photoMode) snapPhoto();
   if (e.code === 'KeyH') document.body.classList.toggle('ui-free');
 });
 
@@ -314,11 +442,22 @@ function loop() {
     game.update(dt, t);
     if (wildlife) wildlife.update(dt, t, { player, hour: game.s.hour % 24, rain: weather.rain, camera });
     if (pool) {
+      const party = game.poolPartyActive();
+      pool.setParty(party);
       pool.update(dt, t, player);
-      checkPoolRunning(t);
+      if (!party) checkPoolRunning(t);
+      else if (pool.onDeck(player.pos.x, player.pos.z) || pool.inPool(player.pos.x, player.pos.z)) {
+        partyTime += dt;
+        if (partyTime > 20 && !game.s.memories.some((m) => m.id === 'pool_dance')) {
+          game.fx({ fun: 12, relax: 6 });
+          ui.toast('Doris grabs your hand and pulls you into the dancing. Walt, it turns out, can really move.', 'good');
+          game.memory('pool_dance', 'Danced at the pool party under the coloured lights. Walt, it turns out, can really move.');
+        }
+      }
     }
     if (dolphin) {
       const talkingReg = game.talking === 'reg';
+      dolphin.setStage(game.bonfireActive() ? L.bonfire : null);
       dolphin.update(dt, t, { player, hour: game.s.hour % 24, talking: talkingReg, speaking: talkingReg && ui.typing });
       if (talkingReg && ui.typing && t - lastClick > 0.22) {
         lastClick = t;
@@ -332,7 +471,7 @@ function loop() {
     if (touch) {
       // On touch screens the action button carries the prompt.
       ui.prompt(null);
-      touch.update(f && player.enabled ? f.label : climb ? 'Climb out' : null, !game.busy && player.enabled);
+      touch.update(photoMode ? 'Take photo' : f && player.enabled ? f.label : climb ? 'Climb out' : null, !game.busy && player.enabled);
     } else if (f && player.enabled) ui.prompt(f.label);
     else if (climb) ui.prompt('Climb out', 'Space');
     else ui.prompt(null);
@@ -392,6 +531,8 @@ function loop() {
       underwater: under,
       night: night > 0.5,
       barDist: Math.hypot(p.x - L.bar.x, p.z - L.bar.z),
+      partyDist: L.pool ? Math.hypot(p.x - L.pool.x, p.z - L.pool.z) : Infinity,
+      party: !!game && game.poolPartyActive(),
       wind: Math.min(1, Math.max(0, (p.y - 3) / 18)),
       hour,
       rain: weather.rain,
@@ -458,9 +599,18 @@ function setupExtras(extras) {
     .filter(Boolean);
 }
 
+// Standing places round the outside of the bonfire circle.
+const BONFIRE_RING = { skye: 0.55, chad: 1.6, doris: 2.4, walt: 2.75, gordon: 3.7 };
+function bonfireSpot(key) {
+  const a = BONFIRE_RING[key] + Math.PI;
+  const B = L.bonfire;
+  return { x: B.x + Math.cos(a) * 4.6, z: B.z + Math.sin(a) * 4.6, face: Math.atan2(-Math.cos(a), -Math.sin(a)) };
+}
+
 // The pool: slide, cannonballs, the flamingo, loungers, and Chad's whistle.
 let pool = null;
 let poolWhistle = 0;
+let partyTime = 0;
 function hookPool(g) {
   g.pool = pool;
   const P = pool;
@@ -487,7 +637,7 @@ function hookPool(g) {
     pos: { x: P.board.x0 - 0.4, z: P.board.z },
     r: 1.8,
     y: P.deck,
-    label: () => 'Cannonball off the diving board!',
+    label: () => (g.poolPartyActive() && !g.s.memories.some((m) => m.id === 'pool_party') ? 'Enter the cannonball contest!' : 'Cannonball off the diving board!'),
     act: () => {
       g.busy = true;
       P.startCannonball(player, () => {
@@ -495,7 +645,11 @@ function hookPool(g) {
         audio.splash(true);
         const m = g.mult('cannonball');
         g.fx({ fun: 14 * m, energy: -3 });
-        if (chadHere()) {
+        if (g.poolPartyActive() && !g.s.memories.some((m) => m.id === 'pool_party')) {
+          g.fx({ fun: 18, relax: 6 });
+          ui.toast('SPLOOSH. The judges confer. Chad: 9.5. And Doris... holds up a FOUR. The deck goes silent. Then the whole party goes wild. Gordon spills his drink.', 'good');
+          g.memory('pool_party', 'Won the pool party cannonball contest. Doris gave you a 4, the highest score in recorded history.');
+        } else if (chadHere()) {
           const a = (6 + Math.random() * 3.5).toFixed(1);
           const b = (6 + Math.random() * 3.5).toFixed(1);
           const doris = Math.random() < 0.15 ? 4 : Math.floor(1 + Math.random() * 3);
@@ -614,11 +768,18 @@ function addExtraInteractions(g) {
 function updateExtras(dt, t, hour) {
   for (const { h, cfg } of extraList) {
     // Beachgoers head indoors when it rains.
-    const on = hour >= cfg.hours[0] && hour < cfg.hours[1] && (weather.rain < 0.3 || cfg.rainproof);
+    const atParty = game && game.poolPartyActive() && pool && pool.partySpots[h.role.key];
+    const on = (hour >= cfg.hours[0] && hour < cfg.hours[1] && (weather.rain < 0.3 || cfg.rainproof)) || !!atParty || (game && game.bonfireActive() && BONFIRE_RING[h.role.key] !== undefined && (h.role.key !== 'gordon' || game.s.memories.some((m) => m.id === 'gordon')));
     h.group.visible = on;
     if (!on) continue;
     const evening = cfg.night && hour >= 19;
-    const spot = evening ? cfg.night : cfg.day;
+    let spot = evening ? cfg.night : cfg.day;
+    // The last night: everyone you've met comes to the bonfire (Gordon only
+    // if you got him to relax enough to leave the pool).
+    const key = h.role.key;
+    const atFire = game && game.bonfireActive() && BONFIRE_RING[key] !== undefined && (key !== 'gordon' || game.s.memories.some((m) => m.id === 'gordon'));
+    if (atFire) spot = bonfireSpot(key);
+    else if (atParty) spot = atParty;
     h.group.position.set(spot.x, world.groundAt(spot.x, spot.z), spot.z);
     const talking = !!game && game.talking === h.role.key && !!h.role.key;
     // Face whoever she's talking to; otherwise drift back to her own view.
@@ -626,10 +787,11 @@ function updateExtras(dt, t, hour) {
     let dy = want - h.group.rotation.y;
     dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     h.group.rotation.y += dy * Math.min(1, dt * (talking ? 5 : 1.5));
-    h.pose = evening && h.role.evening ? 'dance' : null;
+    h.pose = (evening && h.role.evening) || (atParty && ['doris', 'walt', 'partygirl', 'gordon'].includes(key)) ? 'dance' : null;
     // Skye takes selfies on and off, until someone talks her out of it.
     if (h.role.selfie && !talking && !(game && game.s.flags.skyePhoneDown) && (t + 3) % 19 < 11) h.pose = 'laptop';
     const near = started && Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) < 7;
-    h.update(dt, t, { look: near ? player.pos : null, talking, speaking: talking && ui.typing });
+    const far = Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z) > 75;
+    h.update(dt, t, { look: near ? player.pos : null, talking, speaking: talking && ui.typing, far: far && !talking });
   }
 }

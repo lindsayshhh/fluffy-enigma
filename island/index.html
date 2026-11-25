@@ -10,28 +10,29 @@
   "imports": {
     "three": "./vendor/three.module.js",
     "three/addons/": "./vendor/addons/",
-    "./src/assets.js": "./src/assets.js?v=16",
-    "./src/audio.js": "./src/audio.js?v=16",
-    "./src/dialogue.js": "./src/dialogue.js?v=16",
-    "./src/dolphin.js": "./src/dolphin.js?v=16",
-    "./src/game.js": "./src/game.js?v=16",
-    "./src/humans.js": "./src/humans.js?v=16",
-    "./src/layout.js": "./src/layout.js?v=16",
-    "./src/main.js": "./src/main.js?v=16",
-    "./src/noise.js": "./src/noise.js?v=16",
-    "./src/people.js": "./src/people.js?v=16",
-    "./src/player.js": "./src/player.js?v=16",
-    "./src/pool.js": "./src/pool.js?v=16",
-    "./src/post.js": "./src/post.js?v=16",
-    "./src/props.js": "./src/props.js?v=16",
-    "./src/sky.js": "./src/sky.js?v=16",
-    "./src/terrain.js": "./src/terrain.js?v=16",
-    "./src/textures.js": "./src/textures.js?v=16",
-    "./src/touch.js": "./src/touch.js?v=16",
-    "./src/ui.js": "./src/ui.js?v=16",
-    "./src/water.js": "./src/water.js?v=16",
-    "./src/weather.js": "./src/weather.js?v=16",
-    "./src/wildlife.js": "./src/wildlife.js?v=16"
+    "./src/assets.js": "./src/assets.js?v=17",
+    "./src/audio.js": "./src/audio.js?v=17",
+    "./src/dialogue.js": "./src/dialogue.js?v=17",
+    "./src/dolphin.js": "./src/dolphin.js?v=17",
+    "./src/game.js": "./src/game.js?v=17",
+    "./src/humans.js": "./src/humans.js?v=17",
+    "./src/layout.js": "./src/layout.js?v=17",
+    "./src/main.js": "./src/main.js?v=17",
+    "./src/map.js": "./src/map.js?v=17",
+    "./src/noise.js": "./src/noise.js?v=17",
+    "./src/people.js": "./src/people.js?v=17",
+    "./src/player.js": "./src/player.js?v=17",
+    "./src/pool.js": "./src/pool.js?v=17",
+    "./src/post.js": "./src/post.js?v=17",
+    "./src/props.js": "./src/props.js?v=17",
+    "./src/sky.js": "./src/sky.js?v=17",
+    "./src/terrain.js": "./src/terrain.js?v=17",
+    "./src/textures.js": "./src/textures.js?v=17",
+    "./src/touch.js": "./src/touch.js?v=17",
+    "./src/ui.js": "./src/ui.js?v=17",
+    "./src/water.js": "./src/water.js?v=17",
+    "./src/weather.js": "./src/weather.js?v=17",
+    "./src/wildlife.js": "./src/wildlife.js?v=17"
   }
 }
     </script>
@@ -51,9 +52,10 @@
       <div id="status"></div>
     </div>
     <div id="rotate">Turn your device sideways for a better view</div>
-    <div id="keys"><kbd>J</kbd> journal <kbd>Esc</kbd> pause</div>
+    <div id="keys"><kbd>J</kbd> journal <kbd>M</kbd> map <kbd>P</kbd> camera <kbd>Esc</kbd> pause</div>
 
     <div id="prompt"></div>
+    <div id="viewfinder"><i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i><p class="mouse-only"><kbd>Click</kbd> take photo · <kbd>P</kbd> or <kbd>Esc</kbd> put the camera away</p><p class="touch-only">Tap the shutter button to take a photo</p></div>
     <div id="toasts"></div>
     <div id="memory"></div>
 
@@ -87,7 +89,7 @@
         <div class="body">
           <p class="controls">
             <kbd>W A S D</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump / climb out of the water ·
-            <kbd>C</kbd> dive while swimming · <kbd>E</kbd> interact · <kbd>1–4</kbd> choose · <kbd>J</kbd> journal
+            <kbd>C</kbd> dive while swimming · <kbd>E</kbd> interact · <kbd>1–4</kbd> choose · <kbd>J</kbd> journal · <kbd>M</kbd> map · <kbd>P</kbd> camera
           </p>
           <label class="opt">Graphics <select id="quality"><option value="high">High</option><option value="low">Low (faster)</option></select></label>
           <label class="opt">Volume <input id="volume" type="range" min="0" max="1" step="0.05" value="0.8" /></label>
@@ -122,18 +124,19 @@
           <button id="start" disabled>Building the island…</button>
           <button id="continue" hidden>Continue vacation</button>
         </div>
+        <div id="loadbar"><i></i></div>
         <p class="controls touch-only">
           Left thumb: move (push all the way to run) · Right thumb: drag to look · Tap the yellow button to talk and do things.
           Best held sideways, with sound on.
         </p>
         <p class="controls mouse-only">
           <kbd>W A S D</kbd> walk · <kbd>Mouse</kbd> look · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump ·
-          <kbd>C</kbd> dive · <kbd>E</kbd> interact · <kbd>J</kbd> journal · Best with sound on, on a computer.<br /><small>Photoscanned textures and models: Poly Haven (CC0) · Characters: Microsoft Rocketbox (MIT) · Palms, plants, loungers and animals: Next Spring, evolveduk, MozzarellaARC, nonsenseblve, Allie2k, Bohdan Lvov, kenchoo, Ra_in_coat, vicente betoret ferrero, LasquetiSpice, Mateus Schwaab on Sketchfab (CC BY 4.0)</small>
+          <kbd>C</kbd> dive · <kbd>E</kbd> interact · <kbd>J</kbd> journal · <kbd>M</kbd> map · <kbd>P</kbd> camera · Best with sound on, on a computer.<br /><small>Photoscanned textures and models: Poly Haven (CC0) · Characters: Microsoft Rocketbox (MIT) · Palms, plants, loungers and animals: Next Spring, evolveduk, MozzarellaARC, nonsenseblve, Allie2k, Bohdan Lvov, kenchoo, Ra_in_coat, vicente betoret ferrero, LasquetiSpice, Mateus Schwaab on Sketchfab (CC BY 4.0)</small>
         </p>
-        <p class="build">Build 16</p>
+        <p class="build">Build 17</p>
       </div>
     </div>
 
-    <script type="module" src="src/main.js?v=16"></script>
+    <script type="module" src="src/main.js?v=17"></script>
   </body>
 </html>
