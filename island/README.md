@@ -49,7 +49,7 @@ Play it on a computer with a mouse and keyboard, with sound on.
 
 ### The pool
 
-On a stone terrace behind the beach, between the bar and the volleyball court (stairs come up from the path). Swim in it, ride the twisting water slide, cannonball off the diving board for scores from Chad (and Doris), flop onto the inflatable flamingo, or try to get a lounger off Doris. Don't run on the deck.
+On a travertine terrace behind the beach, between the bar and the volleyball court (stairs come up from the path), with a glass balustrade, tropical planters and two palms. The water reflects the sky, deepens in colour over the deep end and throws moving caustic light on the mosaic. Swim in it, ride the twisting water slide, cannonball off the diving board for scores from Chad (and Doris), flop onto the inflatable flamingo, or try to get a lounger off Doris. Don't run on the deck.
 
 ### Nights out
 

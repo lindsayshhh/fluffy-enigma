@@ -5,7 +5,9 @@
 import * as THREE from 'three';
 import { height } from './terrain.js';
 import { texMaterial } from './assets.js';
-import { placeLounger } from './props.js';
+import { placeLounger, makePlant } from './props.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { canvasWeave } from './textures.js';
 import { EYE } from './player.js';
 
 // Terrace and pool rectangles, relative to the pool centre (L.pool).
@@ -27,72 +29,156 @@ function canvasTex(w, h, draw, repeat = [1, 1]) {
   return t;
 }
 
-// Small glossy pool tiles, with a dark lane stripe option.
-function tileTexture() {
-  return canvasTex(256, 256, (g, w) => {
-    const n = 8;
-    const s = w / n;
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        const v = 0.9 + Math.random() * 0.1;
-        g.fillStyle = `rgb(${(120 * v) | 0},${(200 * v) | 0},${(225 * v) | 0})`;
-        g.fillRect(i * s, j * s, s, s);
-      }
-    }
-    g.strokeStyle = 'rgba(255,255,255,0.75)';
-    g.lineWidth = 2;
-    for (let i = 0; i <= n; i++) {
-      g.beginPath();
-      g.moveTo(i * s, 0);
-      g.lineTo(i * s, w);
-      g.moveTo(0, i * s);
-      g.lineTo(w, i * s);
-      g.stroke();
-    }
-  });
+// Deterministic random numbers, so textures look the same every visit.
+function seeded(seed) {
+  let s = seed >>> 0 || 1;
+  return () => ((s = (s * 16807) % 2147483647) / 2147483647);
 }
 
-// Warm limestone pavers for the deck.
-function paverTexture() {
-  return canvasTex(512, 512, (g, w) => {
-    g.fillStyle = '#d8c8a8';
-    g.fillRect(0, 0, w, w);
-    const rows = 4;
-    const s = w / rows;
-    for (let j = 0; j < rows; j++) {
-      for (let i = 0; i < rows; i++) {
-        const v = 0.9 + Math.random() * 0.14;
-        g.fillStyle = `rgb(${(226 * v) | 0},${(212 * v) | 0},${(184 * v) | 0})`;
-        g.fillRect(i * s + 3, j * s + 3, s - 6, s - 6);
-        for (let k = 0; k < 120; k++) {
-          g.fillStyle = `rgba(${Math.random() < 0.5 ? '120,100,70' : '255,250,235'},${Math.random() * 0.12})`;
-          g.fillRect(i * s + Math.random() * s, j * s + Math.random() * s, 2 + Math.random() * 4, 1 + Math.random() * 3);
+// A tangent-space normal map from a height field (Float32Array, size x size).
+function heightToNormal(H, size, strength = 2) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const img = g.createImageData(size, size);
+  const at = (x, y) => H[((y + size) % size) * size + ((x + size) % size)];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * strength;
+      const dy = (at(x, y + 1) - at(x, y - 1)) * strength;
+      const l = Math.hypot(dx, dy, 1);
+      const i = (y * size + x) * 4;
+      img.data[i] = (-dx / l * 0.5 + 0.5) * 255;
+      img.data[i + 1] = (dy / l * 0.5 + 0.5) * 255;
+      img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}
+
+// Glass mosaic: n x n small tiles per texture (about 5 cm at the 1.6 m repeat
+// used for boxes), with grout, slight colour variation and a matching normal
+// map so the grout lines catch the light.
+function mosaic(colors, { n = 32, grout = '#d9e6e8', seed = 1 } = {}) {
+  const size = 512;
+  const s = size / n;
+  const r = seeded(seed);
+  const H = new Float32Array(size * size);
+  const map = canvasTex(size, size, (g) => {
+    g.fillStyle = grout;
+    g.fillRect(0, 0, size, size);
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const col = new THREE.Color(colors[Math.floor(r() * colors.length)]);
+        col.multiplyScalar(0.92 + r() * 0.14);
+        const x0 = i * s + 1.5;
+        const y0 = j * s + 1.5;
+        const grad = g.createLinearGradient(x0, y0, x0 + s, y0 + s);
+        grad.addColorStop(0, `#${col.clone().multiplyScalar(1.08).getHexString()}`);
+        grad.addColorStop(1, `#${col.getHexString()}`);
+        g.fillStyle = grad;
+        g.fillRect(x0, y0, s - 3, s - 3);
+      }
+    }
+  });
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const fx = (x % s) / s;
+      const fy = (y % s) / s;
+      const e = Math.min(fx, fy, 1 - fx, 1 - fy) * s; // distance to the tile edge in pixels
+      H[y * size + x] = Math.min(1, Math.max(0, (e - 1) / 2));
+    }
+  }
+  return { map, normal: heightToNormal(H, size, 0.6) };
+}
+
+// Travertine pavers: 60 cm stones in a running bond with soft veining,
+// little pits and recessed joints (two stones per 1.2 m texture repeat).
+function travertine(seed = 3) {
+  const size = 512;
+  const half = size / 2;
+  const r = seeded(seed);
+  const H = new Float32Array(size * size).fill(1);
+  const map = canvasTex(size, size, (g) => {
+    g.fillStyle = '#b9a98c';
+    g.fillRect(0, 0, size, size);
+    for (let row = 0; row < 2; row++) {
+      for (let k = -1; k < 2; k++) {
+        const x0 = k * half + (row ? half / 2 : 0);
+        const y0 = row * half;
+        const v = 0.93 + r() * 0.1;
+        g.fillStyle = `rgb(${(232 * v) | 0},${(219 * v) | 0},${(193 * v) | 0})`;
+        g.fillRect(x0 + 2, y0 + 2, half - 4, half - 4);
+        // Veins: soft wavy bands running along the stone.
+        g.save();
+        g.beginPath();
+        g.rect(x0 + 2, y0 + 2, half - 4, half - 4);
+        g.clip();
+        for (let i = 0; i < 9; i++) {
+          const y = y0 + r() * half;
+          g.strokeStyle = r() < 0.5 ? `rgba(170,145,105,${0.08 + r() * 0.12})` : `rgba(255,250,238,${0.1 + r() * 0.15})`;
+          g.lineWidth = 1 + r() * 4;
+          g.beginPath();
+          g.moveTo(x0, y);
+          for (let x = 0; x <= half; x += 16) g.lineTo(x0 + x, y + Math.sin(x * 0.03 + i) * 5 + (r() - 0.5) * 3);
+          g.stroke();
         }
+        for (let i = 0; i < 60; i++) {
+          g.fillStyle = `rgba(120,100,70,${0.15 + r() * 0.25})`;
+          g.beginPath();
+          g.ellipse(x0 + r() * half, y0 + r() * half, 0.6 + r() * 2.2, 0.4 + r() * 1.2, 0, 0, Math.PI * 2);
+          g.fill();
+        }
+        g.restore();
       }
     }
   });
+  for (let y = 0; y < size; y++) {
+    const row = y < half ? 0 : 1;
+    const fy = y % half;
+    for (let x = 0; x < size; x++) {
+      const fx = (x - (row ? half / 2 : 0) + size) % half;
+      const e = Math.min(fx, fy, half - fx, half - fy);
+      H[y * size + x] = Math.min(1, Math.max(0, (e - 1.5) / 2.5));
+    }
+  }
+  return { map, normal: heightToNormal(H, size, 1.0) };
 }
 
-// Moving light ripples on the pool floor (emissive, scrolled each frame).
+// Pool caustics: bright, thin cell borders (a tileable Voronoi F2 - F1).
 function causticTexture() {
-  return canvasTex(256, 256, (g, w) => {
-    g.fillStyle = '#000';
-    g.fillRect(0, 0, w, w);
-    g.strokeStyle = 'rgba(255,255,255,0.55)';
-    g.lineCap = 'round';
-    for (let i = 0; i < 70; i++) {
-      g.lineWidth = 1 + Math.random() * 2.2;
-      g.beginPath();
-      let x = Math.random() * w;
-      let y = Math.random() * w;
-      g.moveTo(x, y);
-      for (let k = 0; k < 4; k++) {
-        x += (Math.random() - 0.5) * 50;
-        y += (Math.random() - 0.5) * 50;
-        g.quadraticCurveTo(x + (Math.random() - 0.5) * 30, y + (Math.random() - 0.5) * 30, x, y);
+  const N = 256;
+  const r = seeded(7);
+  const pts = Array.from({ length: 18 }, () => [r() * N, r() * N]);
+  return canvasTex(N, N, (g) => {
+    const img = g.createImageData(N, N);
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        let f1 = 1e9;
+        let f2 = 1e9;
+        for (const [px, py] of pts) {
+          for (let ox = -N; ox <= N; ox += N) {
+            for (let oy = -N; oy <= N; oy += N) {
+              const d = Math.hypot(x - px - ox, y - py - oy);
+              if (d < f1) {
+                f2 = f1;
+                f1 = d;
+              } else if (d < f2) f2 = d;
+            }
+          }
+        }
+        const v = Math.pow(Math.max(0, 1 - (f2 - f1) / 9), 2.2) * 255;
+        const i = (y * N + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+        img.data[i + 3] = 255;
       }
-      g.stroke();
     }
+    g.putImageData(img, 0, 0);
   });
 }
 
@@ -225,6 +311,7 @@ export class Pool {
     this.rect = { x0: X(POOL.x0), x1: X(POOL.x1), z0: Z(POOL.z0), z1: Z(POOL.z1) };
     this.deckRect = { x0: X(DECK.x0), x1: X(DECK.x1), z0: Z(DECK.z0), z1: Z(DECK.z1) };
     world.poolSurface = (x, z) => (this.inPool(x, z) ? this.surface : null);
+    this.surfaceY = this.surface;
 
     const grp = new THREE.Group();
     scene.add(grp);
@@ -232,17 +319,49 @@ export class Pool {
     const box = (w, h, d, mat, x, y, z) => world.box(w, h, d, mat, x, y, z, grp);
 
     // ---------------------------------------------------- materials
-    const pavers = paverTexture();
-    const deckMat = new THREE.MeshStandardMaterial({ map: pavers, roughness: 0.75 });
+    const trav = travertine();
+    const deckMat = new THREE.MeshStandardMaterial({ map: trav.map, normalMap: trav.normal, color: 0xe8e2d8, roughness: 0.72 });
+    deckMat.normalScale.set(0.8, 0.8);
     const stone =
       texMaterial('rock_ground', { color: new THREE.Color(1.35, 1.25, 1.1), roughness: 1 }) ||
       new THREE.MeshStandardMaterial({ color: 0xbfae8f, roughness: 0.95 });
-    const tiles = tileTexture();
+    // Pale aqua glass mosaic for the basin, with moving caustic light on it
+    // below the waterline (in world space, so it runs across floor and walls).
     this.caustics = causticTexture();
-    this.caustics.repeat.set(0.35, 0.35);
-    const tileMat = new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.25, emissive: 0xffffff, emissiveMap: this.caustics, emissiveIntensity: 0.28 });
+    this.cu = {
+      uCaus: { value: this.caustics },
+      uOff1: { value: new THREE.Vector2() },
+      uOff2: { value: new THREE.Vector2() },
+      uSurf: { value: 0 },
+      uCStr: { value: 1 },
+      uGlow: { value: 0 },
+    };
+    const tiles = mosaic(['#e9f6f7', '#d3eef2', '#bfe6ee', '#a9dce8', '#f4fbfb'], { seed: 2 });
+    const tileMat = new THREE.MeshStandardMaterial({ map: tiles.map, normalMap: tiles.normal, roughness: 0.12 });
+    tileMat.normalScale.set(0.5, 0.5);
+    tileMat.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, this.cu);
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vCW;')
+        .replace('#include <project_vertex>', '#include <project_vertex>\nvCW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vCW;\nuniform sampler2D uCaus;\nuniform vec2 uOff1, uOff2;\nuniform float uSurf, uCStr, uGlow;')
+        .replace(
+          '#include <emissivemap_fragment>',
+          `#include <emissivemap_fragment>
+          float under = 1.0 - smoothstep(uSurf - 0.05, uSurf + 0.02, vCW.y);
+          vec2 cuv = vCW.xz * 0.42 + vec2(vCW.y * 0.15);
+          float c1 = texture2D(uCaus, cuv + uOff1).r;
+          float c2 = texture2D(uCaus, cuv * 1.37 + uOff2).r;
+          totalEmissiveRadiance += diffuseColor.rgb * (vec3(0.85, 1.0, 1.0) * min(c1, c2) * 2.6 * uCStr + vec3(0.25, 0.8, 1.0) * uGlow) * under;`
+        );
+    };
+    tileMat.customProgramCacheKey = () => 'pooltiles';
     this.tileMat = tileMat;
-    const coping = new THREE.MeshStandardMaterial({ color: 0xf4efe4, roughness: 0.5 });
+    const bandTiles = mosaic(['#0b3d6b', '#12528a', '#1d6fa5', '#0e4778', '#2a83b8'], { seed: 5, grout: '#c9d6dc' });
+    const bandMat = new THREE.MeshStandardMaterial({ map: bandTiles.map, normalMap: bandTiles.normal, roughness: 0.1 });
+    const navy = new THREE.MeshStandardMaterial({ color: 0x123f6b, roughness: 0.3 });
+    const coping = new THREE.MeshStandardMaterial({ map: trav.map, normalMap: trav.normal, color: 0xfff6e6, roughness: 0.6 });
     const white = new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.45 });
     const steel = new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.2, metalness: 0.9 });
     const red = new THREE.MeshStandardMaterial({ color: 0xd62828, roughness: 0.5 });
@@ -330,7 +449,10 @@ export class Pool {
       const y = floorShallow + rise * i;
       const x0 = POOL.x0;
       const x1 = POOL.x0 + (3 - i) * 0.8;
-      box(x1 - x0, y - floorShallow + 0.2, stepW, coping, X((x0 + x1) / 2), (y + floorShallow - 0.2) / 2, Z(sz));
+      box(x1 - x0, y - floorShallow + 0.2, stepW, tileMat, X((x0 + x1) / 2), (y + floorShallow - 0.2) / 2, Z(sz));
+      // Dark tiles along each step's edge, so you can see it underwater.
+      box(0.12, 0.04, stepW + 0.01, navy, X(x1 - 0.06), y + 0.003, Z(sz));
+      box(0.02, 0.12, stepW + 0.01, navy, X(x1 + 0.005), y - 0.06, Z(sz));
       world.platforms.push({ x0: X(x0), x1: X(x1), z0: Z(sz - stepW / 2), z1: Z(sz + stepW / 2), y });
     }
     // Walls: tiled inside, from the deep floor up to the coping.
@@ -341,11 +463,50 @@ export class Pool {
     box(pw, pwH, 0.2, tileMat, X((POOL.x0 + POOL.x1) / 2), pwy, Z(POOL.z1 + 0.1));
     box(0.2, pwH, pd + 0.4, tileMat, X(POOL.x0 - 0.1), pwy, Z(sz));
     box(0.2, pwH, pd + 0.4, tileMat, X(POOL.x1 + 0.1), pwy, Z(sz));
-    // Coping stones round the rim.
-    box(pw + 0.8, 0.12, 0.4, coping, X((POOL.x0 + POOL.x1) / 2), this.deck + 0.01, Z(POOL.z0 - 0.2));
-    box(pw + 0.8, 0.12, 0.4, coping, X((POOL.x0 + POOL.x1) / 2), this.deck + 0.01, Z(POOL.z1 + 0.2));
-    box(0.4, 0.12, pd, coping, X(POOL.x0 - 0.2), this.deck + 0.01, Z(sz));
-    box(0.4, 0.12, pd, coping, X(POOL.x1 + 0.2), this.deck + 0.01, Z(sz));
+    // Coping: pale stone round the rim, with a rounded (bullnose) edge that
+    // overhangs the water a little.
+    const cx = X((POOL.x0 + POOL.x1) / 2);
+    const nose = (len, x, z, alongX) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, len, 12, 1), coping);
+      m.rotation.set(alongX ? 0 : Math.PI / 2, 0, alongX ? Math.PI / 2 : 0);
+      m.position.set(x, this.deck + 0.005, z);
+      m.castShadow = m.receiveShadow = true;
+      grp.add(m);
+    };
+    box(pw + 0.9, 0.09, 0.45, coping, cx, this.deck + 0.005, Z(POOL.z0 - 0.225));
+    box(pw + 0.9, 0.09, 0.45, coping, cx, this.deck + 0.005, Z(POOL.z1 + 0.225));
+    box(0.45, 0.09, pd, coping, X(POOL.x0 - 0.225), this.deck + 0.005, Z(sz));
+    box(0.45, 0.09, pd, coping, X(POOL.x1 + 0.225), this.deck + 0.005, Z(sz));
+    nose(pw, cx, Z(POOL.z0) + 0.01, true);
+    nose(pw, cx, Z(POOL.z1) - 0.01, true);
+    nose(pd, X(POOL.x0) + 0.01, Z(sz), false);
+    nose(pd, X(POOL.x1) - 0.01, Z(sz), false);
+    // Waterline band of dark-blue mosaic, just in front of the walls.
+    const bandH = 0.34;
+    const by = this.deck - 0.04 - bandH / 2;
+    box(pw, bandH, 0.02, bandMat, cx, by, Z(POOL.z0) + 0.012);
+    box(pw, bandH, 0.02, bandMat, cx, by, Z(POOL.z1) - 0.012);
+    box(0.02, bandH, pd, bandMat, X(POOL.x0) + 0.012, by, Z(sz));
+    box(0.02, bandH, pd, bandMat, X(POOL.x1) - 0.012, by, Z(sz));
+    // Lane lines on the floor, with T-ends.
+    for (const lz of [-2.6, 0.6, 3.6].map((v) => v * (pd / 12))) {
+      const zc = Z(sz + lz);
+      box(DEEP_X - 2 - POOL.x0 - 2.4, 0.01, 0.22, navy, X((POOL.x0 + 1.2 + DEEP_X - 2 - 1.2) / 2), floorShallow + 0.006, zc);
+      box(POOL.x1 - DEEP_X - 2.0, 0.01, 0.22, navy, X((DEEP_X + 1.0 + POOL.x1 - 1.0) / 2), floorDeep + 0.006, zc);
+      box(0.22, 0.01, 0.9, navy, X(POOL.x1 - 1.0), floorDeep + 0.006, zc);
+    }
+    // Underwater lights in the long walls.
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xdff8ff, emissiveIntensity: 0.6, roughness: 0.2 });
+    this.lampMat = lampMat;
+    for (const lx of [-8, -2, 5]) {
+      for (const [lz, ry] of [[POOL.z0 + 0.03, 0], [POOL.z1 - 0.03, Math.PI]]) {
+        const fy = lx < DEEP_X ? floorShallow : floorDeep;
+        const lamp = new THREE.Mesh(new THREE.CircleGeometry(0.13, 20), lampMat);
+        lamp.position.set(X(lx), Math.min(this.surface - 0.45, fy + 0.5), Z(lz));
+        lamp.rotation.y = ry;
+        grp.add(lamp);
+      }
+    }
     // Swimmers can't pass through the pool walls.
     const pr = (x0, x1, z0, z1) => world.colliders.push({ x0: X(x0), x1: X(x1), z0: Z(z0), z1: Z(z1), y: this.surface - 0.25 });
     pr(POOL.x0 - 0.6, POOL.x1 + 0.6, POOL.z0 - 0.6, POOL.z0);
@@ -365,7 +526,7 @@ export class Pool {
     // Ladder at the deep end.
     for (const dz of [-0.3, 0.3]) {
       const lx = X(POOL.x1 - 0.25);
-      const lz = Z(POOL.z0 + 2 + dz);
+      const lz = Z(POOL.z1 - 1.8 + dz); // south side, clear of the slide and the board
       const r = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.03, 8, 16, Math.PI), steel);
       r.position.set(lx + 0.25, this.deck + 0.05, lz);
       r.rotation.y = Math.PI / 2;
@@ -375,17 +536,47 @@ export class Pool {
 
     // ---------------------------------------------------- water
     this.ripples = rippleNormal();
-    const water = new THREE.Mesh(
-      new THREE.PlaneGeometry(pw, pd),
-      new THREE.MeshStandardMaterial({ color: 0x2fb8d8, transparent: true, opacity: 0.72, roughness: 0.05, metalness: 0.15, normalMap: this.ripples, normalScale: new THREE.Vector2(0.45, 0.45), depthWrite: false })
-    );
+    // Water: reflects the sky at a glance and turns clear when you look
+    // straight down (Fresnel), deeper blue over the deep end, with two layers
+    // of ripples drifting in different directions.
+    this.wu = {
+      uW1: { value: new THREE.Vector2() },
+      uW2: { value: new THREE.Vector2() },
+      uShallow: { value: new THREE.Color(0x21aacb) },
+      uDeep: { value: new THREE.Color(0x0a6aa3) },
+      uX0: { value: X(DEEP_X - 2.5) },
+      uX1: { value: X(DEEP_X + 3) },
+    };
+    const waterMat = new THREE.MeshStandardMaterial({ color: 0x5fd3e3, transparent: true, roughness: 0.03, metalness: 0, normalMap: this.ripples, normalScale: new THREE.Vector2(0.3, 0.3), depthWrite: false, envMapIntensity: 1.25 });
+    waterMat.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, this.wu);
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWP;')
+        .replace('#include <project_vertex>', '#include <project_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWP;\nuniform vec2 uW1, uW2;\nuniform vec3 uShallow, uDeep;\nuniform float uX0, uX1;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(uShallow, uDeep, smoothstep(uX0, uX1, vWP.x));')
+        .replace(
+          'vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;',
+          'vec3 mapN = normalize(vec3((texture2D(normalMap, vNormalMapUv + uW1).xy * 2.0 - 1.0) + (texture2D(normalMap, vNormalMapUv * 2.6 + uW2).xy * 2.0 - 1.0) * 0.7, 1.0));'
+        )
+        .replace(
+          '#include <opaque_fragment>',
+          `float fres = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 3.0);
+          diffuseColor.a = mix(0.58, 0.97, fres);
+          #include <opaque_fragment>`
+        );
+    };
+    waterMat.customProgramCacheKey = () => 'poolwater';
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(pw, pd), waterMat);
     water.rotation.x = -Math.PI / 2;
     water.position.set(X((POOL.x0 + POOL.x1) / 2), this.surface, Z(sz));
     water.renderOrder = 2;
     grp.add(water);
     this.water = water;
     // The same surface seen from underneath.
-    const under = new THREE.Mesh(water.geometry, new THREE.MeshBasicMaterial({ color: 0x7fe3f2, transparent: true, opacity: 0.35, side: THREE.BackSide, depthWrite: false }));
+    const under = new THREE.Mesh(water.geometry, new THREE.MeshBasicMaterial({ color: 0x9fe8f4, transparent: true, opacity: 0.45, side: THREE.BackSide, depthWrite: false }));
+    this.under = under;
     under.rotation.x = -Math.PI / 2;
     under.position.copy(water.position);
     grp.add(under);
@@ -406,7 +597,7 @@ export class Pool {
       new THREE.Vector3(sxp(8.6), this.surface + 0.25, Z(-4.2)),
     ];
     this.slide = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.4);
-    const slideMat = new THREE.MeshStandardMaterial({ color: 0x1fb5e5, roughness: 0.18, metalness: 0.05, side: THREE.DoubleSide });
+    const slideMat = new THREE.MeshPhysicalMaterial({ color: 0x1a9fdb, roughness: 0.25, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08, side: THREE.DoubleSide });
     const slideMesh = new THREE.Mesh(halfPipe(this.slide, 0.55), slideMat);
     slideMesh.castShadow = true;
     slideMesh.receiveShadow = true;
@@ -483,21 +674,144 @@ export class Pool {
       world.colliders.push({ x: X(lx), z: Z(DECK.z0 + 2.7), r: 0.55, y: d + 0.5 });
       this.loungers.push({ x: X(lx), z: Z(DECK.z0 + 2.7), reserved });
     });
-    const umb = new THREE.MeshStandardMaterial({ map: stripeBall(['#ff8fab', '#ffffff', '#ff8fab', '#ffffff', '#ff8fab', '#ffffff']), roughness: 0.9, side: THREE.DoubleSide });
+    // Market umbrellas: cream canvas on a teak pole, with ribs and a valance.
+    const weave = canvasWeave();
+    const canvasMat = new THREE.MeshStandardMaterial({ map: weave.map, normalMap: weave.normal, color: 0xf3ead6, roughness: 0.95, side: THREE.DoubleSide });
+    const teak = new THREE.MeshStandardMaterial({ color: 0x8a5a36, roughness: 0.7 });
     for (const ux of [-11, -0.4]) {
-      world.cyl(0.04, 0.04, 2.6, white, X(ux), d + 1.3, Z(DECK.z0 + 1.6), grp, 6);
-      const can = new THREE.Mesh(new THREE.ConeGeometry(2.2, 0.7, 12, 1, true), umb);
-      can.position.set(X(ux), d + 2.6, Z(DECK.z0 + 1.6));
+      const ug = new THREE.Group();
+      ug.position.set(X(ux), d, Z(DECK.z0 + 1.6));
+      grp.add(ug);
+      this.world.cyl(0.035, 0.04, 2.75, teak, 0, 1.37, 0, ug, 10);
+      this.world.cyl(0.28, 0.32, 0.1, new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.5 }), 0, 0.05, 0, ug, 16);
+      const can = new THREE.Mesh(new THREE.ConeGeometry(2.25, 0.62, 8, 1, true), canvasMat);
+      can.position.y = 2.55;
+      can.rotation.y = Math.PI / 8;
       can.castShadow = true;
-      grp.add(can);
+      ug.add(can);
+      const val = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.25, 0.16, 8, 1, true), canvasMat);
+      val.position.y = 2.17;
+      val.rotation.y = Math.PI / 8;
+      ug.add(val);
+      const finial = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), teak);
+      finial.position.y = 2.9;
+      ug.add(finial);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const rib = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 2.3, 5), teak);
+        rib.position.set(Math.cos(a) * 1.1, 2.5, Math.sin(a) * 1.1);
+        rib.rotation.set(0, -a, Math.PI / 2 - 0.27);
+        ug.add(rib);
+      }
       world.shade.push({ x: X(ux), z: Z(DECK.z0 + 2.3), r: 2.4 });
     }
-    // Potted palms at the corners.
-    const pot = new THREE.MeshStandardMaterial({ color: 0xb5651d, roughness: 0.8 });
-    for (const [px, pz] of [[DECK.x0 + 1.2, DECK.z0 + 1.2], [DECK.x0 + 1.2, DECK.z1 - 1.2], [DECK.x1 - 1.2, DECK.z0 + 1.2]]) {
-      world.cyl(0.45, 0.35, 0.7, pot, X(px), d + 0.35, Z(pz), grp, 12);
-      world.colliders.push({ x: X(px), z: Z(pz), r: 0.5, y: d + 0.6 });
+
+    // Planting: a long stone planter behind the loungers, big planters with
+    // palms at two corners, and pots by the stairs.
+    const soil = new THREE.MeshStandardMaterial({ color: 0x3b2a1c, roughness: 1 });
+    const planter = (x0, x1, z0, z1, h = 0.5) => {
+      box(x1 - x0, h, z1 - z0, stone, X((x0 + x1) / 2), d + h / 2, Z((z0 + z1) / 2));
+      box(x1 - x0 - 0.16, 0.04, z1 - z0 - 0.16, soil, X((x0 + x1) / 2), d + h - 0.03, Z((z0 + z1) / 2));
+      world.colliders.push({ x0: X(x0), x1: X(x1), z0: Z(z0), z1: Z(z1), y: d + h + 0.1 });
+    };
+    const plant = (kind, x, z, size, rot = 0, pick = 0, y = d + 0.48) => {
+      const p = makePlant(kind, 1, pick);
+      if (!p) return null;
+      const s = size / p.userData.height;
+      p.scale.setScalar(s);
+      p.position.set(X(x), y, Z(z));
+      p.rotation.y = rot;
+      grp.add(p);
+      return p;
+    };
+    planter(DECK.x0 + 2.4, DECK.x1 - 2.6, DECK.z0 + 0.35, DECK.z0 + 1.25);
+    const kinds = ['Monstera', 'Fern', 'Palm', 'Monstera', 'Banana', 'Fern'];
+    let pk = 0;
+    for (let x = DECK.x0 + 3.2; x < DECK.x1 - 3.2; x += 1.55) {
+      const kind = kinds[pk % kinds.length];
+      plant(kind, x, DECK.z0 + 0.8, { Monstera: 1.2, Fern: 0.8, Palm: 2.2, Banana: 2.6 }[kind], pk * 1.7, pk);
+      pk++;
     }
+    for (const [px, pz, rot] of [[DECK.x0 + 1.25, DECK.z0 + 1.25, -2.4], [DECK.x0 + 1.25, DECK.z1 - 1.25, 2.4]]) {
+      planter(px - 0.95, px + 0.95, pz - 0.95, pz + 0.95, 0.6);
+      plant('tree', px, pz, 6.5, rot, px > 0 ? 1 : 3, d + 0.55);
+      plant('Fern', px + 0.4, pz + 0.3, 0.7, 0.4, 1, d + 0.58);
+      world.shade.push({ x: X(px), z: Z(pz), r: 3 });
+    }
+    planter(DECK.x1 - 2.2, DECK.x1 - 0.4, DECK.z0 + 0.4, DECK.z0 + 2.2, 0.6);
+    plant('Banana', DECK.x1 - 1.3, DECK.z0 + 1.3, 3.0, 0.8, 2, d + 0.58);
+    const pot = new THREE.MeshStandardMaterial({ color: 0xc9b79a, roughness: 0.85 });
+    for (const px of [STAIRS_X - 2.6, STAIRS_X + 2.6]) {
+      world.cyl(0.42, 0.32, 0.75, pot, X(px), d + 0.375, Z(DECK.z1 - 0.9), grp, 18);
+      plant('Monstera', px, DECK.z1 - 0.9, 1.1, px, 3, d + 0.72);
+      world.colliders.push({ x: X(px), z: Z(DECK.z1 - 0.9), r: 0.5, y: d + 0.7 });
+    }
+
+    // Glass balustrade round the terrace edge (with a gap for the stairs).
+    const glassGeos = [];
+    const postGeos = [];
+    const railGeos = [];
+    const H = 1.0;
+    const railRun = (ax, az, bx, bz) => {
+      const len = Math.hypot(bx - ax, bz - az);
+      const n = Math.max(1, Math.round(len / 1.8));
+      const ang = Math.atan2(bz - az, bx - ax);
+      for (let i = 0; i < n; i++) {
+        const u0 = i / n;
+        const u1 = (i + 1) / n;
+        const mx = X(ax + (bx - ax) * (u0 + u1) / 2);
+        const mz = Z(az + (bz - az) * (u0 + u1) / 2);
+        const gg = new THREE.BoxGeometry((len / n) - 0.08, H - 0.12, 0.02);
+        gg.rotateY(-ang);
+        gg.translate(mx, d + (H - 0.12) / 2 + 0.04, mz);
+        glassGeos.push(gg);
+      }
+      for (let i = 0; i <= n; i++) {
+        const u = i / n;
+        const pg = new THREE.BoxGeometry(0.05, H, 0.05);
+        pg.translate(X(ax + (bx - ax) * u), d + H / 2, Z(az + (bz - az) * u));
+        postGeos.push(pg);
+      }
+      const rg = new THREE.CylinderGeometry(0.03, 0.03, len, 8);
+      rg.rotateZ(Math.PI / 2);
+      rg.rotateY(-ang);
+      rg.translate(X((ax + bx) / 2), d + H, Z((az + bz) / 2));
+      railGeos.push(rg);
+      // Keep people on the terrace.
+      world.colliders.push({ x0: X(Math.min(ax, bx)) - 0.12, x1: X(Math.max(ax, bx)) + 0.12, z0: Z(Math.min(az, bz)) - 0.12, z1: Z(Math.max(az, bz)) + 0.12, y: d + 0.9, yMin: d - 0.5 });
+    };
+    const e = 0.15;
+    railRun(DECK.x0 + e, DECK.z0 + e, DECK.x1 - e, DECK.z0 + e);
+    railRun(DECK.x0 + e, DECK.z0 + e, DECK.x0 + e, DECK.z1 - e);
+    railRun(DECK.x1 - e, DECK.z0 + e, DECK.x1 - e, DECK.z1 - e);
+    railRun(DECK.x0 + e, DECK.z1 - e, STAIRS_X - gap, DECK.z1 - e);
+    railRun(STAIRS_X + gap, DECK.z1 - e, DECK.x1 - e, DECK.z1 - e);
+    const glass = new THREE.Mesh(mergeGeometries(glassGeos), new THREE.MeshStandardMaterial({ color: 0xcfeef2, transparent: true, opacity: 0.16, roughness: 0.04, metalness: 0.1, depthWrite: false }));
+    glass.renderOrder = 1;
+    grp.add(glass);
+    const posts = new THREE.Mesh(mergeGeometries([...postGeos, ...railGeos.map((g) => g.toNonIndexed())].map((g) => (g.index ? g.toNonIndexed() : g))), steel);
+    posts.castShadow = true;
+    grp.add(posts);
+    this.glass = glass;
+
+    // Towel stand by the top of the stairs: rolled towels on a teak rack.
+    const rack = new THREE.Group();
+    rack.position.set(X(STAIRS_X - 4.6), d, Z(DECK.z1 - 0.75));
+    grp.add(rack);
+    for (const sx of [-0.55, 0.55]) this.world.box(0.05, 1.0, 0.45, teak, sx, 0.5, 0, rack);
+    for (const sy of [0.25, 0.6, 0.95]) this.world.box(1.15, 0.03, 0.45, teak, 0, sy, 0, rack);
+    const towelCols = ['#f1ebdd', '#2f8f93', '#f1ebdd', '#e3825f', '#f1ebdd'];
+    for (const sy of [0.25, 0.6]) {
+      for (let i = 0; i < 5; i++) {
+        const t = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.42, 14), new THREE.MeshStandardMaterial({ map: weave.map, color: towelCols[i], roughness: 1 }));
+        t.rotation.x = Math.PI / 2;
+        t.position.set(-0.42 + i * 0.21, sy + 0.1, 0);
+        t.castShadow = true;
+        rack.add(t);
+      }
+    }
+    world.colliders.push({ x0: X(STAIRS_X - 5.2), x1: X(STAIRS_X - 4.0), z0: Z(DECK.z1 - 1.0), z1: Z(DECK.z1 - 0.5), y: d + 1 });
+
     // Chad's sign.
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(1.6, 1.0),
@@ -627,9 +941,9 @@ export class Pool {
     // The pool glows from its underwater lights.
     const m = this.water.material;
     m.emissive.set(on ? 0x18b4e8 : 0x000000);
-    m.emissiveIntensity = on ? 0.9 : 0;
-    this.tileMat.emissiveIntensity = on ? 0.9 : 0.28;
-    this.tileMat.emissive.set(on ? 0x7fe6ff : 0xffffff);
+    m.emissiveIntensity = on ? 0.5 : 0;
+    this.cu.uGlow.value = on ? 1.4 : 0;
+    this.lampMat.emissiveIntensity = on ? 3 : 0.6;
   }
 
   text(lines, w = 256, h = 96, bg = null, fg = '#1d3557') {
@@ -698,10 +1012,24 @@ export class Pool {
     this.splashPts.visible = true;
   }
 
-  update(dt, t, player) {
-    // Water and light ripples.
-    this.ripples.offset.set(t * 0.02, t * 0.013);
-    this.caustics.offset.set(Math.sin(t * 0.15) * 0.3, t * 0.025);
+  update(dt, t, player, sun = 1) {
+    // The island keeps its sky reflections subtle; the pool water gets the
+    // full-strength sky so it mirrors it like real water.
+    const env = this.scene.environment;
+    const wm = this.water.material;
+    if (env && wm.envMap !== env) {
+      const first = !wm.envMap;
+      wm.envMap = env;
+      wm.envMapIntensity = 1.1;
+      if (first) wm.needsUpdate = true;
+    }
+    // Water ripples drift two ways; caustics wobble across the floor.
+    this.wu.uW1.value.set(t * 0.018, t * 0.011);
+    this.wu.uW2.value.set(-t * 0.013, t * 0.021);
+    this.cu.uOff1.value.set(t * 0.021, t * 0.013);
+    this.cu.uOff2.value.set(-t * 0.016, t * 0.019);
+    this.cu.uSurf.value = this.surface;
+    this.cu.uCStr.value = Math.min(1.2, sun / 2.5);
     // Inflatables drift and bob, and get nudged by swimmers.
     for (const f of this.floaties) {
       const pp = player.pos;

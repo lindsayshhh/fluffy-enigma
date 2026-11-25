@@ -216,7 +216,7 @@ async function build() {
   };
 
   try {
-    post = new Post(renderer, scene, camera, { skipAO: [water, sky.sky, sky.clouds, sky.cloudDeck, sky.stars, sky.moonMesh, weather.drops, weather.bow, weather.veil] });
+    post = new Post(renderer, scene, camera, { skipAO: [water, sky.sky, sky.clouds, sky.cloudDeck, sky.stars, sky.moonMesh, weather.drops, weather.bow, weather.veil, ...(pool ? [pool.water, pool.under] : [])] });
     applyQuality(quality);
   } catch (e) {
     console.warn('Post-processing unavailable; rendering directly.', e);
@@ -444,7 +444,7 @@ function loop() {
     if (pool) {
       const party = game.poolPartyActive();
       pool.setParty(party);
-      pool.update(dt, t, player);
+      pool.update(dt, t, player, sky.sun.intensity);
       if (!party) checkPoolRunning(t);
       else if (pool.onDeck(player.pos.x, player.pos.z) || pool.inPool(player.pos.x, player.pos.z)) {
         partyTime += dt;

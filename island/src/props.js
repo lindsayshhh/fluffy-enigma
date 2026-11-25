@@ -363,6 +363,26 @@ function scannedPlants() {
   return out.length ? out : null;
 }
 
+// One scanned plant (kind: 'Monstera', 'Banana', 'Palm', 'Fern') or palm
+// tree ('tree') as a group of meshes, for hand-placed planting (the pool).
+let plantCache;
+export function makePlant(kind, scale = 1, pick = 0) {
+  if (plantCache === undefined) plantCache = { plants: scannedPlants() || [], palms: scannedPalms() || [] };
+  const list = kind === 'tree' ? plantCache.palms : plantCache.plants.filter((v) => v.kind === kind);
+  if (!list.length) return null;
+  const v = list[pick % list.length];
+  const g = new THREE.Group();
+  for (const p of v.parts) {
+    const m = new THREE.Mesh(p.geometry, p.mat);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    g.add(m);
+  }
+  g.scale.setScalar(scale);
+  g.userData.height = v.height * scale;
+  return g;
+}
+
 const MAT = {};
 // Resort cushions: mostly natural canvas, a few in the island's colours.
 const LOUNGER_CUSHIONS = ['#f1ebdd', '#f1ebdd', '#2f8f93', '#f1ebdd', '#d9967a', '#f1ebdd', '#2f8f93'];
