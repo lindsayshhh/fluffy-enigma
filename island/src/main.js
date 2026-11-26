@@ -21,6 +21,7 @@ import { Wildlife, SPECIES } from './wildlife.js';
 import { Pool } from './pool.js';
 import { drawMap } from './map.js';
 import { Flowers } from './flowers.js';
+import { Adventures } from './adventures.js';
 
 const TOUCH = isTouchDevice();
 if (TOUCH) document.body.classList.add('touch');
@@ -177,6 +178,11 @@ async function build() {
   game = fresh();
   addExtraInteractions(game);
   if (pool) hookPool(game);
+  try {
+    adventures = new Adventures({ scene, world, L, game, player, ui, audio, getDolphin: () => dolphin, getExtras: () => extraList });
+  } catch (e) {
+    console.warn('Adventures failed to set up', e);
+  }
   player.teleport(L.spawn.x, L.spawn.z, world.myHut.deckY, -0.7);
 
   // Debug hooks: ?hour=17.5 starts at a given time, ?at=bar teleports.
@@ -208,8 +214,10 @@ async function build() {
 
   startBtn.onclick = () => {
     clearSave();
+    newAlbum(); // a new vacation gets a new album
     begin(false);
   };
+  game.photos = photos;
   contBtn.onclick = () => {
     Object.assign(game.s, saved);
     game.s.hour = 8;
@@ -247,7 +255,7 @@ async function build() {
     }
   });
 
-  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList, dolphin: () => dolphin, wildlife: () => wildlife, pool: () => pool, flowers: () => flowers };
+  window.__palmera = { game, player, world, L, sky, post, weather, extras: () => extraList, dolphin: () => dolphin, wildlife: () => wildlife, pool: () => pool, flowers: () => flowers, adventures: () => adventures };
   requestAnimationFrame(loop);
 }
 
@@ -295,7 +303,36 @@ function openJournal(tab = 'log') {
 
 // ---------------------------------------------------------------- camera
 let photoMode = false;
-const photos = [];
+// The album: small copies are kept in this browser between visits (the
+// full-size image only for this session), and become the scrapbook at the end.
+const PHOTO_KEY = 'palmera-cay-photos';
+const photos = (() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PHOTO_KEY) || '[]');
+    return Array.isArray(saved) ? saved.filter((p) => p && p.thumb) : [];
+  } catch {
+    return [];
+  }
+})();
+function savePhotos() {
+  // Keep the newest that fit; browsers allow a few MB.
+  for (let n = Math.min(photos.length, 12); n > 0; n--) {
+    try {
+      localStorage.setItem(PHOTO_KEY, JSON.stringify(photos.slice(-n).map((p) => ({ thumb: p.thumb, caption: p.caption, subject: p.subject, n: p.n }))));
+      return;
+    } catch {
+      /* too big: try fewer */
+    }
+  }
+}
+function newAlbum() {
+  photos.length = 0;
+  try {
+    localStorage.setItem(PHOTO_KEY, '[]');
+  } catch {
+    /* storage unavailable */
+  }
+}
 function setPhotoMode(on) {
   if (on && (!started || game.busy || !player.enabled)) return;
   photoMode = on;
@@ -365,11 +402,12 @@ function snapPhoto() {
     c.width = 480;
     c.height = Math.round((480 * img.height) / img.width);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    photo.thumb = c.toDataURL('image/jpeg', 0.75);
+    photo.thumb = c.toDataURL('image/jpeg', 0.72);
+    savePhotos();
   };
   img.src = full;
   photos.push(photo);
-  if (photos.length > 24) photos.shift().full = null;
+  if (photos.length > 24) photos.splice(0, 1);
   game.photos = photos;
   ui.flash();
   audio.shutter();
@@ -420,6 +458,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyE') game.interact();
   if (e.code === 'KeyJ') openJournal();
   if (e.code === 'KeyM') openJournal('map');
+  if (e.code === 'KeyF') document.body.classList.toggle('show-fps');
   if (e.code === 'KeyP') setPhotoMode(!photoMode);
   if (e.code === 'Enter' && photoMode) snapPhoto();
   if (e.code === 'KeyH') document.body.classList.toggle('ui-free');
@@ -432,6 +471,33 @@ addEventListener('resize', () => {
   if (post) post.setSize(innerWidth, innerHeight);
 });
 
+// Frame rate: an optional counter (F), and a one-time switch to Low graphics
+// if High is clearly too much for this device.
+const fpsEl = document.createElement('div');
+fpsEl.id = 'fps';
+document.body.appendChild(fpsEl);
+let fpsFrames = 0;
+let fpsTime = 0;
+let slowFor = 0;
+let autoLowered = false;
+function trackFps(raw) {
+  fpsFrames++;
+  fpsTime += raw;
+  if (fpsTime < 1) return;
+  const fps = fpsFrames / fpsTime;
+  fpsFrames = 0;
+  fpsTime = 0;
+  if (document.body.classList.contains('show-fps')) fpsEl.textContent = `${Math.round(fps)} fps · ${quality === 'high' ? 'High' : 'Low'}`;
+  if (!started || game.busy || autoLowered || quality !== 'high' || t < 15) return;
+  slowFor = fps < 26 ? slowFor + 1 : 0;
+  if (slowFor >= 6) {
+    autoLowered = true;
+    applyQuality('low');
+    qSel.value = 'low';
+    ui.toast('Switched to Low graphics to keep things smooth. You can change it back in the pause menu.', 'neutral');
+  }
+}
+
 const clock = new THREE.Clock();
 let t = 0;
 const fogDay = new THREE.Color();
@@ -439,7 +505,9 @@ const fogWater = new THREE.Color('#0d5560');
 
 function loop() {
   requestAnimationFrame(loop);
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const raw = clock.getDelta();
+  const dt = Math.min(raw, 0.05);
+  trackFps(Math.min(raw, 1));
   t += dt;
   shared.uTime.value = t;
 
@@ -448,6 +516,10 @@ function loop() {
     game.update(dt, t);
     if (wildlife) wildlife.update(dt, t, { player, hour: game.s.hour % 24, rain: weather.rain, camera });
     if (flowers) flowers.update(t, camera);
+    if (adventures) adventures.update(dt, t);
+    // The snorkel mask: deep dives, and clear water.
+    player.deepDive = !!game.s.items.mask;
+    document.body.classList.toggle('mask', !!game.s.items.mask);
     if (pool) {
       const party = game.poolPartyActive();
       pool.setParty(party);
@@ -505,7 +577,8 @@ function loop() {
   ui && ui.setUnderwater(under);
   fogDay.copy(st.fog);
   scene.fog.color.copy(under ? fogWater : fogDay);
-  scene.fog.density = under ? 0.075 : 0.0014 + night * 0.002 + weather.rain * 0.006;
+  const masked = started && game && game.s.items.mask;
+  scene.fog.density = under ? (masked ? 0.026 : 0.075) : 0.0014 + night * 0.002 + weather.rain * 0.006;
 
   const wu = waterUniforms;
   wu.uSunDir.value.copy(sky.dir);
@@ -718,6 +791,7 @@ function checkPoolRunning(t) {
 // Wildlife: a toast the first time you spot each species; a memory for all.
 let wildlife = null;
 let flowers = null;
+let adventures = null;
 function hookWildlife(g) {
   wildlife.getSpotted = () => (g.s.spotted = g.s.spotted || {});
   wildlife.onCry = (kind) => (kind === 'macaw' ? audio.macaw() : audio.gull());
@@ -777,7 +851,8 @@ function updateExtras(dt, t, hour) {
   for (const { h, cfg } of extraList) {
     // Beachgoers head indoors when it rains.
     const atParty = game && game.poolPartyActive() && pool && pool.partySpots[h.role.key];
-    const on = (hour >= cfg.hours[0] && hour < cfg.hours[1] && (weather.rain < 0.3 || cfg.rainproof)) || !!atParty || (game && game.bonfireActive() && BONFIRE_RING[h.role.key] !== undefined && (h.role.key !== 'gordon' || game.s.memories.some((m) => m.id === 'gordon')));
+    const shelterKey = ['skye', 'chad', 'doris', 'walt', 'partygirl'].includes(h.role.key);
+    const on = (hour >= cfg.hours[0] && hour < cfg.hours[1] && (weather.rain < 0.3 || cfg.rainproof || shelterKey)) || !!atParty || (game && game.bonfireActive() && BONFIRE_RING[h.role.key] !== undefined && (h.role.key !== 'gordon' || game.s.memories.some((m) => m.id === 'gordon')));
     h.group.visible = on;
     if (!on) continue;
     const evening = cfg.night && hour >= 19;
@@ -786,8 +861,14 @@ function updateExtras(dt, t, hour) {
     // if you got him to relax enough to leave the pool).
     const key = h.role.key;
     const atFire = game && game.bonfireActive() && BONFIRE_RING[key] !== undefined && (key !== 'gordon' || game.s.memories.some((m) => m.id === 'gordon'));
+    const SHELTER = { skye: 0.4, chad: 1.2, doris: 2.0, walt: 2.35, partygirl: 3.0 };
+    const sheltering = weather.rain > 0.3 && SHELTER[key] !== undefined && !atFire && !atParty;
     if (atFire) spot = bonfireSpot(key);
     else if (atParty) spot = atParty;
+    else if (sheltering) {
+      const a = SHELTER[key] + Math.PI * 0.85;
+      spot = { x: L.bar.x + Math.cos(a) * 7.4, z: L.bar.z + Math.sin(a) * 7.4, face: Math.atan2(-Math.cos(a), -Math.sin(a)) };
+    }
     h.group.position.set(spot.x, world.groundAt(spot.x, spot.z), spot.z);
     const talking = !!game && game.talking === h.role.key && !!h.role.key;
     // Face whoever she's talking to; otherwise drift back to her own view.

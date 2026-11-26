@@ -28,6 +28,7 @@ Play it on a computer with a mouse and keyboard, with sound on.
 | `J` | Journal (leads, memories, map and photos) |
 | `M` | Island map |
 | `P` | Camera (click to take a photo) |
+| `F` | Show the frame rate |
 | `H` | Hide the HUD (for screenshots) |
 | `Esc` | Pause and settings |
 
@@ -51,6 +52,12 @@ Play it on a computer with a mouse and keyboard, with sound on.
 
 On a travertine terrace behind the beach, between the bar and the volleyball court (stairs come up from the path), with a glass balustrade, tropical planters and two palms. The water reflects the sky, deepens in colour over the deep end and throws moving caustic light on the mosaic. Swim in it, ride the twisting water slide, cannonball off the diving board for scores from Chad (and Doris), flop onto the inflatable flamingo, or try to get a lounger off Doris. Don't run on the deck.
 
+### Snorkelling, the sunset cruise and karaoke
+
+- **Snorkelling**: borrow a mask from the free rack by the dock. Underwater turns crystal clear and you can dive much deeper (`C`). Past the west edge of the reef lies the wreck of *The Unsinkable I* with her bell still aboard (the Captain would like it back), and there's a message in a bottle and a gold coin in a giant clam to find on the seabed.
+- **Sunset cruise**: from 4:30 to 6:30 pm the Captain takes you west along the coast at golden hour for $30, with Reg racing the boat.
+- **Karaoke**: when it rains (everyone shelters at the bar) or late in the evening, start karaoke at The Salty Coconut. Who's there reacts, and Walt has a hidden talent.
+
 ### Nights out
 
 - **Pool party** on night two, 7:30 to 11:30 pm: coloured lights, a glowing pool, Gordon on the decks (from the shallow end), Doris and Walt dancing, and a cannonball contest judged by Chad and Doris. A flyer turns up under your door that morning.
@@ -58,7 +65,7 @@ On a travertine terrace behind the beach, between the bar and the volleyball cou
 
 ### Camera and map
 
-Press `P` (or the camera button on a touch screen) to raise your camera: the HUD hides behind a viewfinder, and a click takes a photo. Each photo gets a caption naming whoever or whatever is in the middle of the frame, can be saved to your device, and goes into the album in the journal (for this session). New subjects add a little fun; six of them is a memory. Skye would like to see them.
+Press `P` (or the camera button on a touch screen) to raise your camera: the HUD hides behind a viewfinder, and a click takes a photo. Each photo gets a caption naming whoever or whatever is in the middle of the frame, can be saved to your device, and goes into the album in the journal. Small copies of your last 12 photos are kept in the browser between visits, and the best of them make a scrapbook on the final screen. New subjects add a little fun; six of them is a memory. Skye would like to see them.
 
 The journal (`J`) has a map tab (`M`): the island drawn from the terrain, with paths, places, the people you've met where they are right now, and you.
 
@@ -81,7 +88,7 @@ On a touch screen the game shows on-screen controls: a joystick wherever your le
 
 One in-game hour lasts 45 real seconds, so a full day takes about ten minutes.
 
-The animals load in the background after you start, so the title screen is ready sooner. Characters and animals far from you aren't animated until you get closer, and phones (and the Low setting) get fewer small creatures.
+The animals load in the background after you start, so the title screen is ready sooner. Characters and animals far from you aren't animated until you get closer, and phones (and the Low setting) get fewer small creatures. If High graphics runs below about 26 frames a second for a few seconds, the game switches to Low once and says so.
 
 ## The locals
 
@@ -111,6 +118,7 @@ The animals load in the background after you start, so the title screen is ready
 | `src/humans.js` | Realistic Rocketbox characters: loading, animation blending, head tracking, lip movement and blinking, props |
 | `src/weather.js` | Showers, wet ground, rain sound cues, the overcast veil and rainbows |
 | `src/map.js` | The island map in the journal |
+| `src/adventures.js` | Snorkel gear, the wreck and seabed treasures, the sunset cruise and karaoke |
 | `src/pool.js` | The terrace pool: basin, water, slide, diving board, loungers, inflatables, and the slide and cannonball rides |
 | `src/flowers.js` | Flowering shrubs and trees (drawn near the camera only) and painted flower ground cover across the island |
 | `src/wildlife.js` | Crabs, rays, turtle, gulls, butterflies and macaws, and the spotting checklist |

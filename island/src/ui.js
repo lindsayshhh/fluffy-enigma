@@ -612,13 +612,17 @@ export class UI {
     };
   }
 
-  finale(r) {
+  finale(r, photos = []) {
     const mems = r.memories.length ? r.memories.map((m) => `<li><em>Day ${m.day}</em> ${esc(m.text)}</li>`).join('') : '<li>You did... nothing memorable. Bold.</li>';
+    // Up to six photos for the scrapbook: people and animals first, newest first.
+    const pick = [...photos].reverse().sort((a, b) => (b.subject ? 1 : 0) - (a.subject ? 1 : 0)).slice(0, 6);
+    const book = pick.length ? `<div class="scrapbook">${pick.map((p) => `<figure><img src="${p.thumb}" alt="" /><figcaption>${esc(p.caption)}</figcaption></figure>`).join('')}</div>` : '';
     $('#finale .body').innerHTML = `
       <p class="kicker">Your vacation rating</p>
       <div class="big">${r.score}</div>
       <h2>${esc(r.title)}</h2>
       <p class="stats">${r.bliss} bliss · ${r.memories.length} memories · ${r.shells} shells · $${r.credits} left · phone: ${r.phone ? 'still has 212 unread emails' : 'gone, and good riddance'}</p>
+      ${book}
       <ul class="mems">${mems}</ul>`;
     document.body.classList.add('ui-free');
     $('#finale').classList.add('show');

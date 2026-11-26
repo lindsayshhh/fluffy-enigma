@@ -194,7 +194,8 @@ export class Player {
     if (this.swimming) {
       const wantDive = active && (k.has('KeyC') || k.has('ControlLeft') || this.touchDive);
       const maxDive = Math.max(0, surface - ground - 1.9);
-      this.dive = THREE.MathUtils.damp(this.dive, wantDive ? Math.min(maxDive, 3.5) : 0, 2.2, dt);
+      // With a snorkel mask you can dive much deeper (down to the wreck).
+      this.dive = THREE.MathUtils.damp(this.dive, wantDive ? Math.min(maxDive, this.deepDive ? 8 : 3.5) : 0, 2.2, dt);
       const targetY = surface - EYE + 0.18 - this.dive;
       this.pos.y = THREE.MathUtils.damp(this.pos.y, targetY, 6, dt);
       this.vel.y = 0;

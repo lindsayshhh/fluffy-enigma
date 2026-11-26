@@ -1024,3 +1024,17 @@ body.photo #hud, body.photo #keys, body.photo #prompt, body.photo #toasts, body.
 #photocard .row button { background: rgba(0, 0, 0, 0.08); color: #222; }
 #touch .cam { right: calc(160px + env(safe-area-inset-right, 0px)); }
 body.photo #touch .journal, body.photo #touch .jump, body.photo #touch .dive { display: none; }
+
+/* Frame-rate counter (F) */
+#fps { position: fixed; left: 12px; bottom: 12px; z-index: 20; padding: 4px 9px; border-radius: 8px; background: rgba(0, 0, 0, 0.45); color: #b8f7c4; font: 600 12px ui-monospace, monospace; display: none; pointer-events: none; }
+body.show-fps #fps { display: block; }
+/* The scrapbook on the final screen */
+.scrapbook { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0 8px; }
+.scrapbook figure { margin: 0; padding: 7px 7px 3px; background: #fff; border-radius: 3px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+.scrapbook figure:nth-child(odd) { transform: rotate(-2deg); }
+.scrapbook figure:nth-child(even) { transform: rotate(1.6deg); }
+.scrapbook img { width: 100%; display: block; }
+.scrapbook figcaption { font: italic 11px Georgia, serif; text-align: center; padding: 4px 2px 2px; color: #333; }
+@media (max-width: 640px) { .scrapbook { grid-template-columns: repeat(2, 1fr); } }
+/* Snorkel mask: a soft dark frame when you're underwater wearing it */
+body.mask.underwater::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 5; background: radial-gradient(ellipse 62% 56% at 50% 48%, transparent 78%, rgba(4, 18, 28, 0.82) 100%); }

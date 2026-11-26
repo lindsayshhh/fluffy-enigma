@@ -188,6 +188,33 @@ export class Dolphin {
     let speed = 3.2;
     let surfaceY = -0.55;
 
+    // Racing alongside the Captain's boat on the sunset cruise.
+    if (this.escort && !this.trick && !this.tow) {
+      const b = this.escort;
+      const yaw = b.rotation.y;
+      const side = 4.5 + Math.sin(t * 0.6) * 1.2;
+      const x = b.position.x + Math.cos(yaw) * side + Math.sin(yaw) * 1.5;
+      const z = b.position.z - Math.sin(yaw) * side + Math.cos(yaw) * 1.5;
+      this.pos.x = THREE.MathUtils.damp(this.pos.x, x, 3, dt);
+      this.pos.z = THREE.MathUtils.damp(this.pos.z, z, 3, dt);
+      let dh = yaw - this.heading;
+      dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+      this.heading += dh * Math.min(1, dt * 3);
+      const ph = (t * 0.7) % 1;
+      const breath = ph < 0.4 ? Math.sin((ph / 0.4) * Math.PI) : 0;
+      this.y = THREE.MathUtils.damp(this.y, waveHeight(this.pos.x, this.pos.z, t) - 0.7 + 0.8 * breath, 5, dt);
+      this.pitch = THREE.MathUtils.damp(this.pitch, ph < 0.4 ? -Math.cos((ph / 0.4) * Math.PI) * 0.4 : 0, 6, dt);
+      this.escortNext = this.escortNext || t + 4;
+      if (t > this.escortNext) {
+        this.escortNext = t + 6 + Math.random() * 5;
+        this.leap(Math.random() < 0.5 ? 'spin' : 'leap');
+      }
+      this.state = 'patrol';
+      this.mixer.update(dt * 0.6);
+      this.applyPose(dt, t, false);
+      return;
+    }
+
     if (this.tow) {
       // Round the loop, then let go.
       const T = this.tow;

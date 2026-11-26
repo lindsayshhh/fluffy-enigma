@@ -859,6 +859,7 @@ export class Game {
           ? "Gary's phone buzzes. He looks at it, looks at the fire, and drops it into his drink. It's waterproof. He's a little disappointed."
           : "Gary holds his laptop up to the stars. 'One bar,' he whispers. 'I can see one bar.'"
     );
+    if (f.bellReturned) cards.push('The Captain has brought the bell of The Unsinkable I. He rings it once for every boat that ever went down with honour. It is mostly just the one. Everyone cheers anyway.');
     cards.push(
       has('turtle')
         ? 'The Captain tells the story of Doris the sea turtle again. It is longer this time. Doris now owes him a car.'
@@ -964,7 +965,7 @@ export class Game {
     this.ui.postcard(summary, last, () => {
       if (last) {
         clearSave();
-        this.ui.finale(this.finalReport());
+        this.ui.finale(this.finalReport(), this.photos || []);
         return;
       }
       s.day++;
@@ -1169,6 +1170,10 @@ export class Game {
     if (f.metReg) add(s.memories.some((m) => m.id === 'reg_tow'), 'Reg the dolphin hangs around the bay west of the dock. Swim out to him and he might give you a ride.');
     if (f.metSkye) add(!!f.skyePhoneDown, 'Skye, the influencer on the south beach, has not looked up from her phone all day. Hard to lecture her while yours is buzzing.');
     if (f.skyeGoodPhoto && !f.skyeSunset) add(false, 'Skye liked your photo of her. She might want one more at golden hour (after 5 pm).');
+    if (s.items.mask) add(!!f.bellReturned, f.wreckHint ? 'With the mask you can dive deep (C). The Captain says The Unsinkable I lies just past the west edge of the reef.' : 'With the snorkel mask you can see clearly underwater and dive deep (C). The reef is worth exploring.');
+    if (s.items.bell) add(false, "You're carrying the bell of The Unsinkable I. Someone at the dock would want it back.");
+    if (s.items.note) add(false, "A note from a bottle, signed 'W.H.', 1994. Someone at the pool has some explaining to do.");
+    if (s.items.coin) add(false, 'An old gold coin from the reef. Dez would love it behind the bar.');
     if (s.items.phone) add(false, 'Your phone keeps buzzing. You could hand it to Dez, or find a more permanent solution.');
     add(s.shells >= this.world.shells.length, `Pretty shells found: ${s.shells} / ${this.world.shells.length}. They glint on the beaches.`);
     return out;

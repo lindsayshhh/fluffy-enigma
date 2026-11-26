@@ -93,7 +93,28 @@ export const CHARACTERS = {
           { text: 'Any gossip?', go: 'gossip' },
           { text: "What's the deal with that seagull?", if: (s) => !s.flags.askedKevin, set: ['askedKevin'], go: 'kevin' },
           { text: 'Could you hold my phone? Like... forever?', if: (s) => s.items.phone, go: 'phone' },
+          { text: 'I found an old gold coin on the reef.', if: (s) => s.items.coin, go: 'coin' },
+          {
+            text: 'Fire up the karaoke machine.',
+            if: (s, g) => !s.today.karaoke && ((g.weather && g.weather.rain > 0.3) || (s.hour >= 21 && s.hour < 24.5)),
+            close: true,
+            act: (g) => g.openDialogue('karaoke'),
+          },
           { text: 'See you later, Dez.', end: true },
+        ],
+      },
+      coin: {
+        text: "Dez turns the coin over in the light. 'Spanish. Three hundred years old. Been on the bottom of my bay the whole time I've been pouring drinks on top of it.' He pins it above the bar, next to a photo of Kevin. 'Sixty dollars, and you drink free tonight.'",
+        choices: [
+          {
+            text: 'Deal.',
+            act: (g) => {
+              g.take('coin');
+              g.fx({ fun: 8, credits: 60 });
+              g.memory('coin', 'Found a 300-year-old gold coin on the reef. It hangs above the bar now, next to a photo of Kevin.');
+            },
+            go: 'hub',
+          },
         ],
       },
       drink: {
@@ -319,13 +340,17 @@ export const CHARACTERS = {
       safe: { text: 'She is named The Unsinkable II. Read into that what you will.', choices: [{ text: '...', go: 'hub' }] },
       hub: {
         text: (s, g) => {
+          if (s.hour >= 16.5 && s.hour < 18.6) return "Sunset cruise leaves when you do, sailor. Thirty dollars, one sunset, and a dolphin if he's in the mood.";
           if (s.hour < 9 || s.hour >= 16) return "Tours run nine to four, sailor. The ocean needs her rest. Union rules.";
           return pick(g, 'capHub', ['The Captain squints at the horizon like it owes him money.', "Fair winds today. Or at least winds. I'm not an expert on fairness.", "Reef's calling, sailor. Can you hear it? That's either the reef or my knee."]);
         },
         choices: [
           { text: 'Book a snorkel tour. ($60)', if: (s) => s.hour >= 9 && s.hour < 16 && s.credits >= 60 && !s.items.voucher && s.today.tours < 1, go: 'book' },
           { text: "Use Brenda's snorkel voucher.", if: (s) => s.hour >= 9 && s.hour < 16 && s.items.voucher && s.today.tours < 1, go: 'bookV' },
+          { text: 'Take the sunset cruise. ($30)', if: (s) => s.hour >= 16.5 && s.hour < 18.6 && s.credits >= 30 && !s.today.cruise, go: 'cruise' },
+          { text: 'I found something of yours. On the seabed.', if: (s) => s.items.bell, go: 'bell' },
           { text: 'What happened to The Unsinkable I?', if: (s) => !s.flags.askedU1, set: ['askedU1'], go: 'u1' },
+          { text: 'Where exactly did The Unsinkable I go down?', if: (s) => s.flags.askedU1 && !s.flags.bellReturned, go: 'where' },
           { text: 'Any sailing wisdom?', go: 'wisdom' },
           { text: 'Fair winds, Captain.', end: true },
         ],
@@ -340,6 +365,32 @@ export const CHARACTERS = {
       bookV: {
         text: "A Brenda voucher! Laminated! I've never seen one actually redeemed. Climb aboard, sailor!",
         choices: [{ text: "Let's go!", close: true, act: (g) => g.tour(true) }],
+      },
+      cruise: {
+        text: "Climb aboard. We'll run west along the coast with the sun going down, and back before the stars come out. Hands inside the boat. Feelings, optional.",
+        choices: [
+          { text: "Let's go!", close: true, act: (g) => g.adventures && g.adventures.startCruise() },
+          { text: 'Maybe later.', go: 'hub' },
+        ],
+      },
+      where: {
+        text: "He looks out to the west edge of the reef for a long moment. 'Deep water, just past the coral. If you ever borrow a mask from the rack by the dock... no. Forget I said anything. She's resting.'",
+        choices: [{ text: '(make a mental note)', set: ['wreckHint'], go: 'hub' }],
+      },
+      bell: {
+        text: "You hold out the bell. It's green with age and full of sand. The Captain doesn't say anything for a while. Then he takes it in both hands, turns it over, and rings it once. It sounds terrible. He is crying a little. 'She was a good boat,' he says. 'She was a terrible boat. She was MY boat.'",
+        choices: [
+          {
+            text: '(salute)',
+            set: ['bellReturned'],
+            act: (g) => {
+              g.take('bell');
+              g.fx({ fun: 12, relax: 10 });
+              g.memory('u1_bell', 'Dived to the wreck of The Unsinkable I and brought the Captain her bell. He rang it once. It sounded terrible. He cried a little.');
+            },
+            go: 'hub',
+          },
+        ],
       },
       u1: { text: "We don't talk about The Unsinkable I.", choices: [{ text: '...It sank, didn\'t it?', go: 'u1b' }] },
       u1b: { text: 'She was *reassigned to the seabed*. With full honors. The ducks attended.', choices: [{ text: 'My condolences.', fx: { fun: 6 }, go: 'hub' }] },
@@ -807,6 +858,7 @@ export const CHARACTERS = {
             "The captain's first boat? I was there. I've said nothing. I will say nothing. ...It was the anchor. He forgot to tie the anchor to the boat. Then he threw it in. While standing on it.",
             "That seagull, Kevin, owes me three fish. I'm not saying I'm keeping score. I'm keeping score.",
             'Dez once made me a drink. I do not have hands. He made it anyway and left it on the dock. Respect.',
+            "The captain's first boat is down past the west edge of the reef. I use her bell as a doorbell. Borrow a mask from the rack by the dock and see for yourself.",
             "The man with the laptop holds it up over his head every day like he's offering it to the sky. The sky has not accepted.",
           ];
           if (s.flags.metSkye && !s.flags.skyePhoneDown) lines.push("The girl with the phone has photographed my fin forty-one times. She has never once looked at me. I counted. I'm a dolphin, I have time.");
@@ -953,6 +1005,21 @@ export const CHARACTERS = {
           { text: "...I'm not Doris.", go: 'notdoris' },
           { text: 'Nice safari vest.', go: 'vest' },
           { text: 'Are you enjoying your holiday, Walt?', go: 'holiday' },
+          { text: '(show him the note from the bottle)', if: (s) => s.items.note, go: 'note' },
+        ],
+      },
+      note: {
+        text: "He reads it. He reads it again. His eyes go very wide. He folds it into a tiny square and puts it in one of his fourteen pockets. 'Burn it,' he whispers. Then, louder, toward Doris: 'Yes, dear.'",
+        choices: [
+          {
+            text: '(nod gravely)',
+            act: (g) => {
+              g.take('note');
+              g.fx({ fun: 10 });
+              g.memory('walt_note', "Found Walt's message in a bottle from 1994 and gave it back. He asked you to burn it. You will not burn it.");
+            },
+            end: true,
+          },
         ],
       },
       notdoris: {
@@ -1042,6 +1109,28 @@ export const CHARACTERS = {
       slide: {
         text: "Once. Wonderful. Terrifying. I came out of the bottom and simply never left. That was the Tuesday.",
         choices: [{ text: 'Ah.', fx: { fun: 4 }, go: 'hub' }],
+      },
+    },
+  },
+
+  // ------------------------------------------------------------ KARAOKE
+  karaoke: {
+    name: "Dez's Karaoke Machine",
+    title: 'Rain or night, it is always ready',
+    color: '#9b5de5',
+    start: () => 'pick',
+    nodes: {
+      pick: {
+        text: (s) =>
+          s.flags.metDez
+            ? "Dez wheels out a karaoke machine older than some of the guests. The screen says SELECT SONG in a font that has seen things. Dez hands you the microphone and dims the lights, which are just the one lamp."
+            : "A bartender you haven't really met wheels out a karaoke machine. The screen says SELECT SONG in a font that has seen things.",
+        choices: [
+          { text: "'Sunburn of Love' (power ballad)", close: true, act: (g) => g.adventures && g.adventures.karaoke('ballad') },
+          { text: "'Out of Office' (disco)", close: true, act: (g) => g.adventures && g.adventures.karaoke('disco') },
+          { text: "'Hammock Nights' (country)", close: true, act: (g) => g.adventures && g.adventures.karaoke('country') },
+          { text: '(maybe not)', end: true },
+        ],
       },
     },
   },
